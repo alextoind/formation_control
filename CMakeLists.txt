@@ -2,26 +2,25 @@ cmake_minimum_required(VERSION 2.8.3)
 project(agent_test)
 set(CMAKE_CXX_FLAGS "-std=c++11")
 
-find_package(catkin REQUIRED
-  COMPONENTS
+find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
+  geometry_msgs
+  message_generation
 )
 
-# add_message_files(
-#   DIRECTORY msg
-#   FILES
-# )
+add_message_files(
+  DIRECTORY msg
+  FILES
+    FormationStatistics.msg
+    FormationStatisticsStamped.msg
+)
 
-# add_action_files(
-#   DIRECTORY action
-#   FILES
-# )
-
-# generate_messages(
-#   DEPENDENCIES
-#     std_msgs
-# )
+generate_messages(
+  DEPENDENCIES
+    std_msgs
+    geometry_msgs
+)
 
 include_directories(include
   ${catkin_INCLUDE_DIRS}
@@ -31,6 +30,8 @@ catkin_package(
   CATKIN_DEPENDS
     roscpp
     std_msgs
+    geometry_msgs
+    message_runtime
 )
 
 set(BIN_AGENT_TEST agent_test)
