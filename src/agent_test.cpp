@@ -24,6 +24,7 @@ int main(int argc, char **argv) {
 
   // TODO init (id, target_stats, ...)
 
+
   // TODO forever:
   // TODO estimate stats and share
   // TODO wait for other nodes stats or timeout

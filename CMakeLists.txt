@@ -4,10 +4,12 @@ set(CMAKE_CXX_FLAGS "-std=c++11")
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  cmake_modules
   std_msgs
   geometry_msgs
   message_generation
 )
+find_package(Eigen REQUIRED)
 
 add_message_files(
   DIRECTORY msg
@@ -24,6 +26,7 @@ generate_messages(
 
 include_directories(include
   ${catkin_INCLUDE_DIRS}
+  ${Eigen_INCLUDE_DIRS}
 )
 
 catkin_package(
@@ -32,6 +35,8 @@ catkin_package(
     std_msgs
     geometry_msgs
     message_runtime
+  DEPENDS
+    Eigen
 )
 
 set(BIN_AGENT_TEST agent_test)
@@ -43,6 +48,7 @@ add_executable(${BIN_AGENT_TEST}
 )
 target_link_libraries(${BIN_AGENT_TEST}
   ${catkin_LIBRARIES}
+  ${Eigen_LIBRARIES}
 )
 add_dependencies(${BIN_AGENT_TEST}
   ${catkin_EXPORTED_TARGETS}

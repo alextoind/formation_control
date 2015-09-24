@@ -11,6 +11,7 @@
   <buildtool_depend>catkin</buildtool_depend>
 
   <depend>roscpp</depend>
+  <depend>cmake_modules</depend>
   <depend>std_msgs</depend>
   <depend>geometry_msgs</depend>
 

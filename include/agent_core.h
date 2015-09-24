@@ -26,12 +26,17 @@
 #include <ros/time.h>
 #include <geometry_msgs/Twist.h>
 #include <geometry_msgs/Pose.h>
+#include <Eigen/Dense>
 // Auto-generated from msg/ directory libraries
 #include "agent_test/FormationStatistics.h"
 #include "agent_test/FormationStatisticsStamped.h"
 // license info to be displayed at the beginning
 #define LICENSE_INFO "\n*\n* Copyright (C) 2015 Alessandro Tondo\n* This program comes with ABSOLUTELY NO WARRANTY.\n* This is free software, and you are welcome to\n* redistribute it under GNU GPL v3.0 conditions.\n* (for details see <http://www.gnu.org/licenses/>).\n*\n\n"
-
+// default values for ROS params (if not specified by the user)
+#define DEFAULT_NUMBER_OF_STATS 5  // see FormationStatistics.msg (mx, my, mxx, mxy, myy)
+#define DEFAULT_NUMBER_OF_VELOCITIES 2  // virtual planar linear twist (virtual_x_dot, virutal_y_dot)
+#define DEFAULT_SAMPLE_TIME 0.010  // expressed in seconds
+#define DEFAULT_VELOCITY_VIRTUAL_THRESHOLD 4
 
 class AgentCore {
  public:
@@ -39,6 +44,9 @@ class AgentCore {
   ~AgentCore();
 
  private:
+  ros::NodeHandle *private_node_handle_;
+  ros::NodeHandle node_handle_;
+
   int agent_id_;
   geometry_msgs::Pose pose_;
   geometry_msgs::Pose pose_virtual_;
@@ -49,14 +57,30 @@ class AgentCore {
   std::vector<agent_test::FormationStatistics> received_estimated_statistics_;
 
   double sample_time_;
+  int number_of_stats_;
+  int number_of_velocities_;
+  // consensus
+  Eigen::RowVectorXd phi_dot_;
+  // control law
+  Eigen::MatrixXd gamma_;
+  Eigen::MatrixXd lambda_;
+  Eigen::MatrixXd b_;
+  Eigen::MatrixXd jacob_phi_;
+  // saturations
+  double velocity_virtual_threshold_;
+
 
   void dynamics();
   void consensus();
   void control();
   void guidance();
 
-  std::vector<double> statsMsgToVector(const agent_test::FormationStatistics &msg);
-  agent_test::FormationStatistics statsVectorToMsg(const std::vector<double> &vector);
+  Eigen::VectorXd statsMsgToVector(const agent_test::FormationStatistics &msg);
+  Eigen::MatrixXd statsMsgToMatrix(const std::vector <agent_test::FormationStatistics> &msg);
+  agent_test::FormationStatistics statsVectorToMsg(const Eigen::VectorXd &vector);
+
+  double integrator(const double &x_old, const double &x_dot_old, const double &x_dot_new);
+
 };
 
 #endif

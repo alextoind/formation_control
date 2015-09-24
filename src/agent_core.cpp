@@ -11,10 +11,47 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <geometry_msgs/Pose.h>
 #include "agent_core.h"
 
 AgentCore::AgentCore() {
+  // handles server private parameters (private names are protected from accidental name collisions)
+  private_node_handle_ = new ros::NodeHandle("~");
+
+  private_node_handle_->param("number_of_stats", number_of_stats_, DEFAULT_NUMBER_OF_STATS);
+  private_node_handle_->param("number_of_velocities", number_of_velocities_, DEFAULT_NUMBER_OF_VELOCITIES);
+  private_node_handle_->param("sample_time", sample_time_, (double)DEFAULT_SAMPLE_TIME);
+  private_node_handle_->param("velocity_virtual_threshold_", velocity_virtual_threshold_, (double)DEFAULT_VELOCITY_VIRTUAL_THRESHOLD);
+
+  const Eigen::VectorXd ONES_STATS = Eigen::VectorXd::Ones(number_of_stats_);
+  const std::vector<double> STD_ONES_STATS(ONES_STATS.data(), ONES_STATS.data() + ONES_STATS.size());
+  const Eigen::VectorXd ZEROS_STATS = Eigen::VectorXd::Zero(number_of_stats_);
+  const std::vector<double> STD_ZEROS_STATS(ZEROS_STATS.data(), ZEROS_STATS.data() + ZEROS_STATS.size());
+  const Eigen::VectorXd ONES_VELOCITIES = Eigen::VectorXd::Ones(number_of_velocities_);
+  const std::vector<double> STD_ONES_VELOCITIES(ONES_VELOCITIES.data(), ONES_VELOCITIES.data() + ONES_VELOCITIES.size());
+
+  std::vector<double> diag_elements_gamma;
+  std::vector<double> diag_elements_lambda;
+  std::vector<double> diag_elements_b;
+  private_node_handle_->param("diag_elements_gamma", diag_elements_gamma, STD_ONES_STATS);
+  private_node_handle_->param("diag_elements_lambda", diag_elements_lambda, STD_ZEROS_STATS);
+  private_node_handle_->param("diag_elements_b", diag_elements_b, STD_ONES_VELOCITIES);
+
+  gamma_ = Eigen::Map<Eigen::VectorXd>(diag_elements_gamma.data(), number_of_stats_).asDiagonal();
+  lambda_ = Eigen::Map<Eigen::VectorXd>(diag_elements_lambda.data(), number_of_stats_).asDiagonal();
+  b_ = Eigen::Map<Eigen::VectorXd>(diag_elements_b.data(), number_of_velocities_).asDiagonal();
+  jacob_phi_ = Eigen::MatrixXd::Identity(number_of_stats_, number_of_velocities_);
+  jacob_phi_(3,1) = 2*pose_virtual_.position.x;
+  jacob_phi_(4,1) = pose_virtual_.position.y;
+  jacob_phi_(4,2) = pose_virtual_.position.x;
+  jacob_phi_(5,2) = 2*pose_virtual_.position.y;
+
+  // time derivative of phi(p) = [px, py, pxx, pxy, pyy], used for the dynamic consensus
+  phi_dot_ << twist_virtual_.linear.x,
+              twist_virtual_.linear.y,
+              2*pose_virtual_.position.x*twist_virtual_.linear.x,
+              pose_virtual_.position.y*twist_virtual_.linear.x + pose_virtual_.position.x*twist_virtual_.linear.y,
+              2*pose_virtual_.position.y*twist_virtual_.linear.y;
+
 
 }
 
@@ -23,32 +60,36 @@ AgentCore::~AgentCore() {
 }
 
 void AgentCore::control() {
+  Eigen::VectorXd stats_error = statsMsgToVector(target_statistics_) - statsMsgToVector(estimated_statistics_);
 
+  // twist_virtual = inv(B + Jphi'*lambda*Jphi) * Jphi' * gamma * stats_error
+  Eigen::VectorXd control_law = (b_ + jacob_phi_.transpose()*lambda_*jacob_phi_).inverse()
+                                * jacob_phi_.transpose()*gamma_*stats_error;
+
+  // control command saturation
+  double current_velocity_virtual = std::sqrt(std::pow(control_law(1),2) + std::pow(control_law(2),2));
+  if (current_velocity_virtual > velocity_virtual_threshold_) {
+    control_law *= velocity_virtual_threshold_ / current_velocity_virtual;
+  }
+
+  pose_virtual_.position.x = integrator(pose_virtual_.position.x, twist_virtual_.linear.x, control_law(1));
+  pose_virtual_.position.y = integrator(pose_virtual_.position.y, twist_virtual_.linear.y, control_law(2));
+  twist_virtual_.linear.x = control_law(1);
+  twist_virtual_.linear.y = control_law(2);
+
+  ROS_DEBUG_STREAM("[AgentCore::control] Virtual Agent velocities (x: " << control_law(1) << ", y: " << control_law(2) << ")");
 }
 
 void AgentCore::consensus() {
-  // time derivative of phi(p) = [px, py, pxx, pxy, pyy]'
-  std::vector<double> z_dot = {twist_virtual_.linear.x,
-                               twist_virtual_.linear.y,
-                               2*pose_virtual_.position.x*twist_virtual_.linear.x,
-                               pose_virtual_.position.y*twist_virtual_.linear.x + pose_virtual_.position.x*twist_virtual_.linear.y,
-                               2*pose_virtual_.position.y*twist_virtual_.linear.y};
+  Eigen::RowVectorXd x = statsMsgToVector(estimated_statistics_);
+  Eigen::MatrixXd x_j = statsMsgToMatrix(received_estimated_statistics_);
 
-  // discrete consensus: (I - S*L)xk = xk - S*sum_j(xk - xk_j) = xk + S*sum_j(xk_j - xk)
-  std::vector<double> x = statsMsgToVector(estimated_statistics_);
-  std::vector<double> x_j, I_SLx;
-  std::copy(x.begin(), x.end(), std::back_inserter(I_SLx));
-  for (auto const &received_stat : received_estimated_statistics_) {
-    x_j = statsMsgToVector(received_stat);
-    std::transform(x_j.begin(), x_j.end(), x.begin(), x_j.begin(), std::minus<double>());
-    std::transform(x_j.begin(), x_j.end(), x_j.begin(), [this](double d){ return d*sample_time_; });
-    std::transform(I_SLx.begin(), I_SLx.end(), x_j.begin(), I_SLx.begin(), std::plus<double>());
-  }
+  // dynamic discrete consensus: x_k+1 = z_dot_k*S + (I - S*L)x_k = z_dot_k*S + x_k + S*sum_j(x_j_k - x_k)
+  x += phi_dot_ *sample_time_ + (x_j.rowwise() - x).colwise().sum()*sample_time_;
 
-  // dynamic discrete consensus: xk+1 = zk_dot*S + (I - S*L)xk
-  std::transform(z_dot.begin(), z_dot.end(), z_dot.begin(), [this](double d){ return d*sample_time_; });
-  std::transform(z_dot.begin(), z_dot.end(), I_SLx.begin(), x.begin(), std::plus<double>());
   estimated_statistics_ = statsVectorToMsg(x);
+
+  ROS_DEBUG_STREAM("[AgentCore::consensus] Estimated statistics:\n" << x);
 }
 
 void AgentCore::dynamics() {
@@ -59,22 +100,36 @@ void AgentCore::guidance() {
 
 }
 
-std::vector<double> AgentCore::statsMsgToVector(const agent_test::FormationStatistics &msg) {
-  return std::vector<double>({msg.m_x, msg.m_y, msg.m_xx, msg.m_xy, msg.m_yy});
+Eigen::VectorXd AgentCore::statsMsgToVector(const agent_test::FormationStatistics &msg) {
+  Eigen::VectorXd vector(number_of_stats_);
+  vector << msg.m_x, msg.m_y, msg.m_xx, msg.m_xy, msg.m_yy;
+  return vector;
 }
 
-agent_test::FormationStatistics AgentCore::statsVectorToMsg(const std::vector<double> &vector) {
+Eigen::MatrixXd AgentCore::statsMsgToMatrix(const std::vector<agent_test::FormationStatistics> &msg) {
+  Eigen::MatrixXd matrix(number_of_stats_, number_of_stats_);
+  for (int i=0; i<number_of_stats_; i++) {
+    matrix.row(i) = statsMsgToVector(msg.at(i));
+  }
+  return matrix;
+}
+
+agent_test::FormationStatistics AgentCore::statsVectorToMsg(const Eigen::VectorXd &vector) {
   agent_test::FormationStatistics msg;
-  if (vector.size() != 5) {
+  if (vector.size() != number_of_stats_) {
     ROS_ERROR_STREAM("[AgentCore::statsVectorToMsg] Wrong statistics vector size (" << vector.size() << ")");
     return msg;
   }
 
-  msg.m_x = vector.at(1);
-  msg.m_y = vector.at(2);
-  msg.m_xx = vector.at(3);
-  msg.m_xy = vector.at(4);
-  msg.m_yy = vector.at(5);
+  msg.m_x = vector(1);
+  msg.m_y = vector(2);
+  msg.m_xx = vector(3);
+  msg.m_xy = vector(4);
+  msg.m_yy = vector(5);
 
   return msg;
+}
+
+double AgentCore::integrator(const double &x_old, const double &x_dot_old, const double &x_dot_new) {
+  return x_old + sample_time_*(x_dot_old + x_dot_new)/2;
 }
