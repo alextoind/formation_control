@@ -27,6 +27,7 @@
 #include <geometry_msgs/Twist.h>
 #include <geometry_msgs/Pose.h>
 #include <Eigen/Dense>
+#include <eigen_conversions/eigen_msg.h>
 // Auto-generated from msg/ directory libraries
 #include "agent_test/FormationStatistics.h"
 #include "agent_test/FormationStatisticsStamped.h"
@@ -35,8 +36,18 @@
 // default values for ROS params (if not specified by the user)
 #define DEFAULT_NUMBER_OF_STATS 5  // see FormationStatistics.msg (mx, my, mxx, mxy, myy)
 #define DEFAULT_NUMBER_OF_VELOCITIES 2  // virtual planar linear twist (virtual_x_dot, virutal_y_dot)
-#define DEFAULT_SAMPLE_TIME 0.010  // expressed in seconds
-#define DEFAULT_VELOCITY_VIRTUAL_THRESHOLD 4
+// TODO fix following values
+#define DEFAULT_SAMPLE_TIME 0.25  // expressed in seconds
+#define DEFAULT_VELOCITY_VIRTUAL_THRESHOLD 4.0  // expressed in meters/second
+#define DEFAULT_LOS_DISTANCE_THRESHOLD 4.0
+#define DEFAULT_SPEED_MIN 0.0  // expressed in meters/second
+#define DEFAULT_SPEED_MAX 4.0  // expressed in meters/second
+#define DEFAULT_STEER_MIN -0.52  // expressed in radiants
+#define DEFAULT_STEER_MAX 0.52  // expressed in radiants
+#define DEFAULT_K_P_SPEED 15.0
+#define DEFAULT_K_I_SPEED 0.05
+#define DEFAULT_K_P_STEER 0.5
+#define DEFAULT_VEHICLE_LENGTH 0.4  // expressed in meters
 
 class AgentCore {
  public:
@@ -68,6 +79,23 @@ class AgentCore {
   Eigen::MatrixXd jacob_phi_;
   // saturations
   double velocity_virtual_threshold_;
+  double los_distance_threshold_;
+  double speed_min_;
+  double speed_max_;
+  double steer_min_;
+  double steer_max_;
+
+  double los_distance_;
+  double los_angle_;
+  double speed_error_;
+  double speed_integral_;
+  double speed_command_sat_;
+  double steer_command_sat_;
+  double k_p_speed_;
+  double k_i_speed_;
+  double k_p_steer_; // Ackermann
+
+  double vehicle_length_;
 
 
   void dynamics();
@@ -79,8 +107,8 @@ class AgentCore {
   Eigen::MatrixXd statsMsgToMatrix(const std::vector <agent_test::FormationStatistics> &msg);
   agent_test::FormationStatistics statsVectorToMsg(const Eigen::VectorXd &vector);
 
-  double integrator(const double &x_old, const double &x_dot_old, const double &x_dot_new);
-
+  double integrator(const double &out_old, const double &in_old, const double &in_new, const int &k);
+  double saturation(const double &value, const double &min, const double &max);
 };
 
 #endif

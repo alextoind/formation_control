@@ -7,6 +7,7 @@ find_package(catkin REQUIRED COMPONENTS
   cmake_modules
   std_msgs
   geometry_msgs
+  eigen_conversions
   message_generation
 )
 find_package(Eigen REQUIRED)
