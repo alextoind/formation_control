@@ -107,8 +107,12 @@ class AgentCore {
   Eigen::MatrixXd statsMsgToMatrix(const std::vector <agent_test::FormationStatistics> &msg);
   agent_test::FormationStatistics statsVectorToMsg(const Eigen::VectorXd &vector);
 
-  double integrator(const double &out_old, const double &in_old, const double &in_new, const int &k);
+  double integrator(const double &out_old, const double &in_old, const double &in_new, const double &k);
   double saturation(const double &value, const double &min, const double &max);
+
+  double getTheta(const geometry_msgs::Quaternion &quat);
+
+ void setTetha(geometry_msgs::Quaternion &quat, const double &theta);
 };
 
 #endif

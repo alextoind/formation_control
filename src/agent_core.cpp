@@ -96,7 +96,7 @@ void AgentCore::consensus() {
   Eigen::MatrixXd x_j = statsMsgToMatrix(received_estimated_statistics_);
 
   // dynamic discrete consensus: x_k+1 = z_dot_k*S + (I - S*L)x_k = z_dot_k*S + x_k + S*sum_j(x_j_k - x_k)
-  x += phi_dot_ *sample_time_ + (x_j.rowwise() - x).colwise().sum()*sample_time_;
+  x += phi_dot_*sample_time_ + (x_j.rowwise() - x).colwise().sum()*sample_time_;
 
   estimated_statistics_ = statsVectorToMsg(x);
 
@@ -104,7 +104,17 @@ void AgentCore::consensus() {
 }
 
 void AgentCore::dynamics() {
+  double theta = getTheta(pose_.orientation);
+  double x_dot_new = speed_command_sat_ * std::cos(theta);
+  double y_dot_new = twist_.linear.y = speed_command_sat_ * std::sin(theta);
+  double theta_dot_new = speed_command_sat_ / vehicle_length_ * std::tan(steer_command_sat_);
 
+  pose_.position.x = integrator(pose_.position.x, twist_.linear.x, x_dot_new, 1);
+  pose_.position.y = integrator(pose_.position.y, twist_.linear.y, y_dot_new, 1);
+  setTetha(pose_.orientation, integrator(theta, twist_.angular.z, theta_dot_new, 1));
+  twist_.linear.x = x_dot_new;
+  twist_.linear.y = y_dot_new;
+  twist_.angular.z = theta_dot_new;
 }
 
 void AgentCore::guidance() {
@@ -117,16 +127,13 @@ void AgentCore::guidance() {
   double speed_reference = std::min(speed_max_*los_distance_/los_distance_threshold_, speed_max_);
   double speed_error_old = speed_error_;
   speed_error_ = speed_reference - std::sqrt(std::pow(twist_.linear.x, 2) + std::pow(twist_.linear.y, 2));
-  speed_integral_ = integrator(speed_integral_, speed_error_old, speed_error_,k_i_speed_);
+  speed_integral_ = integrator(speed_integral_, speed_error_old, speed_error_, k_i_speed_);
   double speed_command = k_p_speed_*(speed_error_ + speed_integral_);
   speed_command_sat_ = saturation(speed_command, speed_min_, speed_max_);
   ROS_DEBUG_STREAM("[AgentCore::guidance] Speed command: " << speed_command_sat_);
 
   // TODO: comment the code
-  Eigen::Quaterniond eigen_quat;
-  tf::quaternionMsgToEigen(pose_.orientation, eigen_quat);
-  Eigen::Vector3d rpy = eigen_quat.normalized().matrix().eulerAngles(0, 1, 2);
-  double steer_command = k_p_steer_*std::fmod(los_angle_ - rpy(2), M_PI);
+  double steer_command = k_p_steer_*std::fmod(los_angle_ - getTheta(pose_.orientation), M_PI);
   steer_command_sat_ = saturation(steer_command, steer_min_, steer_max_);
   ROS_DEBUG_STREAM("[AgentCore::guidance] Steer command: " << steer_command_sat_);
 }
@@ -160,10 +167,29 @@ agent_test::FormationStatistics AgentCore::statsVectorToMsg(const Eigen::VectorX
   return msg;
 }
 
-double AgentCore::integrator(const double &out_old, const double &in_old, const double &in_new, const int &k) {
+double AgentCore::integrator(const double &out_old, const double &in_old, const double &in_new, const double &k) {
   return out_old + k*sample_time_*(in_old + in_new)/2;
 }
 
 double AgentCore::saturation(const double &value, const double &min, const double &max) {
   return std::min(std::max(value, min), max);
+}
+
+double AgentCore::getTheta(const geometry_msgs::Quaternion &quat) {
+  Eigen::Quaterniond eigen_quat;
+  tf::quaternionMsgToEigen(quat, eigen_quat);
+  Eigen::Vector3d rpy = eigen_quat.normalized().matrix().eulerAngles(0, 1, 2);
+  return rpy(2);
+}
+
+void AgentCore::setTetha(geometry_msgs::Quaternion &quat, const double &theta) {
+  Eigen::Quaterniond eigen_quat;
+  tf::quaternionMsgToEigen(quat, eigen_quat);
+  Eigen::Vector3d rpy = eigen_quat.normalized().matrix().eulerAngles(0, 1, 2);
+
+  eigen_quat = Eigen::AngleAxisd(rpy(0), Eigen::Vector3d::UnitX())
+               * Eigen::AngleAxisd(rpy(1), Eigen::Vector3d::UnitY())
+               * Eigen::AngleAxisd(theta, Eigen::Vector3d::UnitZ());
+
+  tf::quaternionEigenToMsg(eigen_quat, quat);
 }
