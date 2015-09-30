@@ -21,6 +21,8 @@
 #include <sstream>
 #include <vector>
 #include <map>
+#include <random>
+#include <algorithm>
 // ROS libraries
 #include <ros/ros.h>
 #include <ros/time.h>
@@ -31,6 +33,7 @@
 // Auto-generated from msg/ directory libraries
 #include "agent_test/FormationStatistics.h"
 #include "agent_test/FormationStatisticsStamped.h"
+#include "agent_test/FormationStatisticsArray.h"
 // license info to be displayed at the beginning
 #define LICENSE_INFO "\n*\n* Copyright (C) 2015 Alessandro Tondo\n* This program comes with ABSOLUTELY NO WARRANTY.\n* This is free software, and you are welcome to\n* redistribute it under GNU GPL v3.0 conditions.\n* (for details see <http://www.gnu.org/licenses/>).\n*\n\n"
 // default values for ROS params (if not specified by the user)
@@ -48,6 +51,11 @@
 #define DEFAULT_K_I_SPEED 0.05
 #define DEFAULT_K_P_STEER 0.5
 #define DEFAULT_VEHICLE_LENGTH 0.4  // expressed in meters
+#define DEFAULT_WORLD_LIMIT 5.0  // in meters, considering a "square world"
+#define DEFAULT_TOPIC_QUEUE_LENGTH 1
+#define DEFAULT_SHARED_STATS_TOPIC "shared_stats"
+#define DEFAULT_RECEIVED_STATS_TOPIC "received_stats"
+#define DEFAULT_TARGET_STATS_TOPIC "target_stats"
 
 class AgentCore {
  public:
@@ -56,16 +64,25 @@ class AgentCore {
 
  private:
   ros::NodeHandle *private_node_handle_;
-  ros::NodeHandle node_handle_;
+  ros::Publisher stats_publisher_;
+  ros::Subscriber stats_subscriber_;
+  ros::Subscriber target_stats_subscriber_;
+  ros::Timer algorithm_timer_;
 
-  int agent_id_;
+  std::string shared_stats_topic_name_;
+  std::string received_stats_topic_name_;
+  std::string target_stats_topic_name_;
+  int topic_queue_length_;
+
+  int agent_id_;  // TODO: it must be unique!
+  std::vector<int> neighbours_; // agents connected through an arbitrary path (i.e. in the spanning tree) TODO init!
   geometry_msgs::Pose pose_;
   geometry_msgs::Pose pose_virtual_;
   geometry_msgs::Twist twist_;
   geometry_msgs::Twist twist_virtual_;
-  agent_test::FormationStatistics target_statistics_;
+  agent_test::FormationStatistics target_statistics_; // TODO init!
   agent_test::FormationStatistics estimated_statistics_;
-  std::vector<agent_test::FormationStatistics> received_estimated_statistics_;
+  std::vector<agent_test::FormationStatistics> received_statistics_;
 
   double sample_time_;
   int number_of_stats_;
@@ -77,7 +94,7 @@ class AgentCore {
   Eigen::MatrixXd lambda_;
   Eigen::MatrixXd b_;
   Eigen::MatrixXd jacob_phi_;
-  // saturations
+
   double velocity_virtual_threshold_;
   double los_distance_threshold_;
   double speed_min_;
@@ -96,7 +113,12 @@ class AgentCore {
   double k_p_steer_; // Ackermann
 
   double vehicle_length_;
+  double world_limit_;
 
+
+  void targetStatsCallback(const agent_test::FormationStatistics &target);
+  void receivedStatsCallback(const agent_test::FormationStatisticsArray &received);
+  void algorithmCallback(const ros::TimerEvent &timer_event);
 
   void dynamics();
   void consensus();
@@ -111,8 +133,9 @@ class AgentCore {
   double saturation(const double &value, const double &min, const double &max);
 
   double getTheta(const geometry_msgs::Quaternion &quat);
+  void setTheta(geometry_msgs::Quaternion &quat, const double &theta);
 
- void setTetha(geometry_msgs::Quaternion &quat, const double &theta);
+  void waitForSyncTime();
 };
 
 #endif

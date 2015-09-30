@@ -17,6 +17,7 @@ add_message_files(
   FILES
     FormationStatistics.msg
     FormationStatisticsStamped.msg
+    FormationStatisticsArray.msg
 )
 
 generate_messages(

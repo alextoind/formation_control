@@ -12,26 +12,25 @@
  */
 
 #include "agent_core.h"
-using namespace Eigen;
-using namespace std;
+
 int main(int argc, char **argv) {
-  std::cout << LICENSE_INFO << std::flush;
+  std::cout << LICENSE_INFO << std::flush;  // TODO: move only in the ground station node
 
   ros::init(argc, argv, "agent_test");
 
-//  // activates the asynchronous spinner
-//  ros::AsyncSpinner spinner(1);
-//  spinner.start();
-//
-//  // TODO init (id, target_stats, ...)
-//
-//
-//  // TODO forever:
-//  // TODO estimate stats and share
-//  // TODO wait for other nodes stats or timeout
-//  // TODO control law >> motion (LOS)
-//
-//  ros::waitForShutdown();
+  // activates the asynchronous multi-thread spinner
+  ros::AsyncSpinner spinner(3);
+  spinner.start();
+
+  // TODO init (id, target_stats, ...)
+
+
+  // TODO forever:
+  // TODO estimate stats and share
+  // TODO wait for other nodes stats or timeout
+  // TODO control law >> motion (LOS)
+
+  ros::waitForShutdown();
 
   return 0;
 }
