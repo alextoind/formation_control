@@ -17,6 +17,7 @@ AgentCore::AgentCore() {
   // handles server private parameters (private names are protected from accidental name collisions)
   private_node_handle_ = new ros::NodeHandle("~");
 
+  private_node_handle_->param("agent_id", agent_id_, DEFAULT_AGENT_ID);
   private_node_handle_->param("number_of_stats", number_of_stats_, DEFAULT_NUMBER_OF_STATS);
   private_node_handle_->param("number_of_velocities", number_of_velocities_, DEFAULT_NUMBER_OF_VELOCITIES);
   private_node_handle_->param("sample_time", sample_time_, (double)DEFAULT_SAMPLE_TIME);
@@ -65,14 +66,27 @@ AgentCore::AgentCore() {
   pose_virtual_.position.y = pose_.position.y;
   setTheta(pose_virtual_.orientation, theta);
 
+  std::vector<double> target_statistics;
+  const std::vector<double> DEFAULT_TARGET_STATS = {0, 0, 1, 0, 1};
+  private_node_handle_->param("target_statistics", target_statistics, DEFAULT_TARGET_STATS);
+  target_statistics_ = statsVectorToMsg(target_statistics);
+  std::vector<double> initial_estimation = {pose_.position.x, pose_.position.y, std::pow(pose_.position.x, 2),
+                                            pose_.position.x * pose_.position.y, std::pow(pose_.position.y, 2)};
+  estimated_statistics_ = statsVectorToMsg(initial_estimation);
+
+  private_node_handle_->param("topic_queue_length", topic_queue_length_, DEFAULT_TOPIC_QUEUE_LENGTH);
   private_node_handle_->param("shared_stats_topic", shared_stats_topic_name_, std::string(DEFAULT_SHARED_STATS_TOPIC));
   private_node_handle_->param("received_stats_topic", received_stats_topic_name_, std::string(DEFAULT_RECEIVED_STATS_TOPIC));
   private_node_handle_->param("target_stats_topic", target_stats_topic_name_, std::string(DEFAULT_TARGET_STATS_TOPIC));
-  private_node_handle_->param("topic_queue_length", topic_queue_length_, DEFAULT_TOPIC_QUEUE_LENGTH);
+  private_node_handle_->param("sync_service_name", sync_service_name_, std::string(DEFAULT_RECEIVED_STATS_TOPIC));
+  double sync_timeout;
+  private_node_handle_->param("sync_timeout", sync_timeout, (double)DEFAULT_SYNC_TIMEOUT);
+  sync_timeout_ = ros::Duration(sync_timeout);
+
   stats_publisher_ = private_node_handle_->advertise<agent_test::FormationStatisticsStamped>(shared_stats_topic_name_, topic_queue_length_);
   stats_subscriber_ = private_node_handle_->subscribe(received_stats_topic_name_, topic_queue_length_, &AgentCore::receivedStatsCallback, this);
   target_stats_subscriber_ = private_node_handle_->subscribe(target_stats_topic_name_, topic_queue_length_, &AgentCore::targetStatsCallback, this);
-
+  sync_client_ = private_node_handle_->serviceClient<agent_test::Sync>(sync_service_name_);
   waitForSyncTime();
   algorithm_timer_ = private_node_handle_->createTimer(ros::Duration(sample_time_), &AgentCore::algorithmCallback, this);
 }
@@ -196,8 +210,10 @@ double AgentCore::integrator(const double &out_old, const double &in_old, const 
 
 void AgentCore::receivedStatsCallback(const agent_test::FormationStatisticsArray &received) {
   if (!received_statistics_.empty()) {
-    ROS_WARN_STREAM("[AgentCore::receivedStatsCallback] Last received statistics has not been used.");
+    ROS_ERROR_STREAM("[AgentCore::receivedStatsCallback] Last received statistics has not been used.");
+    received_statistics_.clear();
   }
+  neighbours_ = received.neighbours_;  // updates current neighbourhood
   for (auto const &data : received.vector) {
     if (std::find(std::begin(neighbours_), std::end(neighbours_), std::stoi(data.header.frame_id)) != std::end(neighbours_)) {
       received_statistics_.push_back(data.stats);
@@ -251,6 +267,11 @@ agent_test::FormationStatistics AgentCore::statsVectorToMsg(const Eigen::VectorX
   return msg;
 }
 
+agent_test::FormationStatistics AgentCore::statsVectorToMsg(const std::vector<double> &vector) {
+  std::vector<double> v = vector;  // can't use 'data()' method on const std::vector
+  return statsVectorToMsg(Eigen::Map<Eigen::VectorXd>(v.data(), v.size()).asDiagonal());
+}
+
 void AgentCore::targetStatsCallback(const agent_test::FormationStatistics &target) {
   target_statistics_ = target;
 
@@ -260,5 +281,15 @@ void AgentCore::targetStatsCallback(const agent_test::FormationStatistics &targe
 }
 
 void AgentCore::waitForSyncTime() {
-  // TODO: this implementation strictly depends on the Ground Station node one
+  sync_client_.waitForExistence(sync_timeout_);
+  agent_test::Sync srv;
+  srv.request.agent_id = agent_id_;
+  if (sync_client_.call(srv)) {
+    agent_id_ = srv.response.new_id;  // always update, even if it does not change
+    ROS_DEBUG_STREAM("[AgentCore::waitForSyncTime] Wait for synchronization deadline (" << srv.response.sync_time << ")");
+    ros::Time::sleepUntil(srv.response.sync_time);
+  }
+  else {
+    ROS_ERROR_STREAM("[AgentCore::waitForSyncTime] Can't get synchronization time from the server (Ground Station)");
+  }
 }

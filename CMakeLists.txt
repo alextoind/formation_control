@@ -20,6 +20,12 @@ add_message_files(
     FormationStatisticsArray.msg
 )
 
+add_service_files(
+  DIRECTORY srv
+  FILES
+    Sync.srv
+)
+
 generate_messages(
   DEPENDENCIES
     std_msgs
@@ -41,9 +47,9 @@ catkin_package(
     Eigen
 )
 
+# Agent:
 set(BIN_AGENT_TEST agent_test)
 
-# Agent Test:
 add_executable(${BIN_AGENT_TEST}
   src/agent_test.cpp
   src/agent_core.cpp
@@ -53,5 +59,20 @@ target_link_libraries(${BIN_AGENT_TEST}
   ${Eigen_LIBRARIES}
 )
 add_dependencies(${BIN_AGENT_TEST}
+  ${catkin_EXPORTED_TARGETS}
+)
+
+# Ground Station:
+set(BIN_GROUND_STATION ground_station_test)
+
+add_executable(${BIN_GROUND_STATION}
+  src/ground_station_test.cpp
+  src/ground_station_core.cpp
+)
+target_link_libraries(${BIN_GROUND_STATION}
+  ${catkin_LIBRARIES}
+  ${Eigen_LIBRARIES}
+)
+add_dependencies(${BIN_GROUND_STATION}
   ${catkin_EXPORTED_TARGETS}
 )

@@ -34,12 +34,11 @@
 #include "agent_test/FormationStatistics.h"
 #include "agent_test/FormationStatisticsStamped.h"
 #include "agent_test/FormationStatisticsArray.h"
-// license info to be displayed at the beginning
-#define LICENSE_INFO "\n*\n* Copyright (C) 2015 Alessandro Tondo\n* This program comes with ABSOLUTELY NO WARRANTY.\n* This is free software, and you are welcome to\n* redistribute it under GNU GPL v3.0 conditions.\n* (for details see <http://www.gnu.org/licenses/>).\n*\n\n"
+#include <agent_test/Sync.h>
 // default values for ROS params (if not specified by the user)
 #define DEFAULT_NUMBER_OF_STATS 5  // see FormationStatistics.msg (mx, my, mxx, mxy, myy)
 #define DEFAULT_NUMBER_OF_VELOCITIES 2  // virtual planar linear twist (virtual_x_dot, virutal_y_dot)
-// TODO fix following values
+#define DEFAULT_AGENT_ID 0  // if not setted by the user, the Ground Station will choose an unique value
 #define DEFAULT_SAMPLE_TIME 0.25  // expressed in seconds
 #define DEFAULT_VELOCITY_VIRTUAL_THRESHOLD 4.0  // expressed in meters/second
 #define DEFAULT_LOS_DISTANCE_THRESHOLD 4.0
@@ -56,6 +55,8 @@
 #define DEFAULT_SHARED_STATS_TOPIC "shared_stats"
 #define DEFAULT_RECEIVED_STATS_TOPIC "received_stats"
 #define DEFAULT_TARGET_STATS_TOPIC "target_stats"
+#define DEFAULT_SYNC_SERVICE_NAME "sync_agent"
+#define DEFAULT_SYNC_TIMEOUT 10.0  // expressed in seconds
 
 class AgentCore {
  public:
@@ -68,23 +69,26 @@ class AgentCore {
   ros::Subscriber stats_subscriber_;
   ros::Subscriber target_stats_subscriber_;
   ros::Timer algorithm_timer_;
+  ros::ServiceClient sync_client_;
 
+  int topic_queue_length_;
   std::string shared_stats_topic_name_;
   std::string received_stats_topic_name_;
   std::string target_stats_topic_name_;
-  int topic_queue_length_;
+  std::string sync_service_name_;
+  ros::Duration sync_timeout_;
+  double sample_time_;
 
-  int agent_id_;  // TODO: it must be unique!
-  std::vector<int> neighbours_; // agents connected through an arbitrary path (i.e. in the spanning tree) TODO init!
+  int agent_id_;  // it must be set with a unique value among all agents
+  std::vector<int> neighbours_; // agents connected through an arbitrary path (i.e. in the spanning tree)
   geometry_msgs::Pose pose_;
   geometry_msgs::Pose pose_virtual_;
   geometry_msgs::Twist twist_;
   geometry_msgs::Twist twist_virtual_;
-  agent_test::FormationStatistics target_statistics_; // TODO init!
+  agent_test::FormationStatistics target_statistics_;
   agent_test::FormationStatistics estimated_statistics_;
-  std::vector<agent_test::FormationStatistics> received_statistics_;
+  std::vector<agent_test::FormationStatistics> received_statistics_;  // initialized with Ground Station first msg
 
-  double sample_time_;
   int number_of_stats_;
   int number_of_velocities_;
   // consensus
@@ -128,6 +132,7 @@ class AgentCore {
   Eigen::VectorXd statsMsgToVector(const agent_test::FormationStatistics &msg);
   Eigen::MatrixXd statsMsgToMatrix(const std::vector <agent_test::FormationStatistics> &msg);
   agent_test::FormationStatistics statsVectorToMsg(const Eigen::VectorXd &vector);
+  agent_test::FormationStatistics statsVectorToMsg(const std::vector <double> &vector);
 
   double integrator(const double &out_old, const double &in_old, const double &in_new, const double &k);
   double saturation(const double &value, const double &min, const double &max);

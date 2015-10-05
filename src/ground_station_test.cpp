@@ -11,19 +11,21 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "agent_core.h"
+#include "ground_station_core.h"
 
 int main(int argc, char **argv) {
-  ros::init(argc, argv, "agent_test");
+  std::cout << LICENSE_INFO << std::flush;
+
+  ros::init(argc, argv, "ground_station_test");
 
   // activates the asynchronous multi-thread spinner
-  ros::AsyncSpinner spinner(3);
+  ros::AsyncSpinner spinner(2);
   spinner.start();
 
-  AgentCore *agent = new AgentCore();
+  GroundStationCore *ground_station = new GroundStationCore();
 
   ros::waitForShutdown();
 
-  delete agent;
+  delete ground_station;
   return 0;
 }
