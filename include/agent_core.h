@@ -64,6 +64,7 @@ class AgentCore {
   ~AgentCore();
 
  private:
+  ros::NodeHandle node_handle_;
   ros::NodeHandle *private_node_handle_;
   ros::Publisher stats_publisher_;
   ros::Subscriber stats_subscriber_;

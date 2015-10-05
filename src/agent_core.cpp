@@ -70,6 +70,7 @@ AgentCore::AgentCore() {
   const std::vector<double> DEFAULT_TARGET_STATS = {0, 0, 1, 0, 1};
   private_node_handle_->param("target_statistics", target_statistics, DEFAULT_TARGET_STATS);
   target_statistics_ = statsVectorToMsg(target_statistics);
+
   std::vector<double> initial_estimation = {pose_.position.x, pose_.position.y, std::pow(pose_.position.x, 2),
                                             pose_.position.x * pose_.position.y, std::pow(pose_.position.y, 2)};
   estimated_statistics_ = statsVectorToMsg(initial_estimation);
@@ -78,16 +79,18 @@ AgentCore::AgentCore() {
   private_node_handle_->param("shared_stats_topic", shared_stats_topic_name_, std::string(DEFAULT_SHARED_STATS_TOPIC));
   private_node_handle_->param("received_stats_topic", received_stats_topic_name_, std::string(DEFAULT_RECEIVED_STATS_TOPIC));
   private_node_handle_->param("target_stats_topic", target_stats_topic_name_, std::string(DEFAULT_TARGET_STATS_TOPIC));
-  private_node_handle_->param("sync_service_name", sync_service_name_, std::string(DEFAULT_RECEIVED_STATS_TOPIC));
+  private_node_handle_->param("sync_service_name", sync_service_name_, std::string(DEFAULT_SYNC_SERVICE_NAME));
   double sync_timeout;
   private_node_handle_->param("sync_timeout", sync_timeout, (double)DEFAULT_SYNC_TIMEOUT);
   sync_timeout_ = ros::Duration(sync_timeout);
 
-  stats_publisher_ = private_node_handle_->advertise<agent_test::FormationStatisticsStamped>(shared_stats_topic_name_, topic_queue_length_);
-  stats_subscriber_ = private_node_handle_->subscribe(received_stats_topic_name_, topic_queue_length_, &AgentCore::receivedStatsCallback, this);
-  target_stats_subscriber_ = private_node_handle_->subscribe(target_stats_topic_name_, topic_queue_length_, &AgentCore::targetStatsCallback, this);
-  sync_client_ = private_node_handle_->serviceClient<agent_test::Sync>(sync_service_name_);
+  stats_publisher_ = node_handle_.advertise<agent_test::FormationStatisticsStamped>(shared_stats_topic_name_, topic_queue_length_);
+  stats_subscriber_ = node_handle_.subscribe(received_stats_topic_name_, topic_queue_length_, &AgentCore::receivedStatsCallback, this);
+  target_stats_subscriber_ = node_handle_.subscribe(target_stats_topic_name_, topic_queue_length_, &AgentCore::targetStatsCallback, this);
+  sync_client_ = node_handle_.serviceClient<agent_test::Sync>(sync_service_name_);
+
   waitForSyncTime();
+
   algorithm_timer_ = private_node_handle_->createTimer(ros::Duration(sample_time_), &AgentCore::algorithmCallback, this);
 }
 
@@ -144,15 +147,15 @@ void AgentCore::control() {
                                 * jacob_phi_.transpose()*gamma_*stats_error;
 
   // control command saturation
-  double current_velocity_virtual = std::sqrt(std::pow(control_law(1),2) + std::pow(control_law(2),2));
+  double current_velocity_virtual = std::sqrt(std::pow(control_law(0),2) + std::pow(control_law(1),2));
   if (current_velocity_virtual > velocity_virtual_threshold_) {
     control_law *= velocity_virtual_threshold_ / current_velocity_virtual;
   }
 
-  pose_virtual_.position.x = integrator(pose_virtual_.position.x, twist_virtual_.linear.x, control_law(1), 1);
-  pose_virtual_.position.y = integrator(pose_virtual_.position.y, twist_virtual_.linear.y, control_law(2), 1);
-  twist_virtual_.linear.x = control_law(1);
-  twist_virtual_.linear.y = control_law(2);
+  pose_virtual_.position.x = integrator(pose_virtual_.position.x, twist_virtual_.linear.x, control_law(0), 1);
+  pose_virtual_.position.y = integrator(pose_virtual_.position.y, twist_virtual_.linear.y, control_law(1), 1);
+  twist_virtual_.linear.x = control_law(0);
+  twist_virtual_.linear.y = control_law(1);
 
   ROS_DEBUG_STREAM("[AgentCore::control] Virtual agent pose (x: " << pose_virtual_.position.x
                    << ", y: " << pose_virtual_.position.y << ")");
@@ -258,18 +261,18 @@ agent_test::FormationStatistics AgentCore::statsVectorToMsg(const Eigen::VectorX
     ROS_ERROR_STREAM("[AgentCore::statsVectorToMsg] Wrong statistics vector size (" << vector.size() << ")");
     return msg;
   }
-  msg.m_x = vector(1);
-  msg.m_y = vector(2);
-  msg.m_xx = vector(3);
-  msg.m_xy = vector(4);
-  msg.m_yy = vector(5);
+  msg.m_x = vector(0);
+  msg.m_y = vector(1);
+  msg.m_xx = vector(2);
+  msg.m_xy = vector(3);
+  msg.m_yy = vector(4);
 
   return msg;
 }
 
 agent_test::FormationStatistics AgentCore::statsVectorToMsg(const std::vector<double> &vector) {
   std::vector<double> v = vector;  // can't use 'data()' method on const std::vector
-  return statsVectorToMsg(Eigen::Map<Eigen::VectorXd>(v.data(), v.size()).asDiagonal());
+  return statsVectorToMsg(Eigen::Map<Eigen::VectorXd>(v.data(), v.size()));
 }
 
 void AgentCore::targetStatsCallback(const agent_test::FormationStatistics &target) {

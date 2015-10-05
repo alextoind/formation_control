@@ -28,9 +28,9 @@ GroundStationCore::GroundStationCore() {
   private_node_handle_->param("sync_delay", sync_delay, (double)DEFAULT_SYNC_DELAY);
   sync_delay_ = ros::Duration(sync_delay);
 
-  stats_publisher_ = private_node_handle_->advertise<agent_test::FormationStatisticsArray>(received_stats_topic_name_, topic_queue_length_);
-  stats_subscriber_ = private_node_handle_->subscribe(shared_stats_topic_name_, topic_queue_length_, &GroundStationCore::sharedStatsCallback, this);
-  sync_server_ = private_node_handle_->advertiseService(sync_service_name_, &GroundStationCore::syncAgentCallback, this);
+  stats_publisher_ = node_handle_.advertise<agent_test::FormationStatisticsArray>(received_stats_topic_name_, topic_queue_length_);
+  stats_subscriber_ = node_handle_.subscribe(shared_stats_topic_name_, topic_queue_length_, &GroundStationCore::sharedStatsCallback, this);
+  sync_server_ = node_handle_.advertiseService(sync_service_name_, &GroundStationCore::syncAgentCallback, this);
   waitForSync();
   algorithm_timer_ = private_node_handle_->createTimer(ros::Duration(sample_time_), &GroundStationCore::algorithmCallback, this);
 }

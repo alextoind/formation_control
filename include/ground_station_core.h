@@ -53,6 +53,7 @@ class GroundStationCore {
   ~GroundStationCore();
 
  private:
+  ros::NodeHandle node_handle_;
   ros::NodeHandle *private_node_handle_;
   ros::Publisher target_stats_publisher_;
   ros::Publisher stats_publisher_;
