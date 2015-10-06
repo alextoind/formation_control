@@ -1,4 +1,6 @@
 <launch>
+  <env name="ROSCONSOLE_CONFIG_FILE" value="$(find agent_test)/config/rosconsole_debug_enabled.conf"/>
+
   <arg name="number_of_agents" default="2"/>
   <node pkg="agent_test" type="ground_station_test" name="ground_station" output="screen" cwd="ROS_HOME">
     <param name="number_of_agents" type="int" value="$(arg number_of_agents)" />

@@ -51,6 +51,7 @@ AgentCore::AgentCore() {
   lambda_ = Eigen::Map<Eigen::VectorXd>(diag_elements_lambda.data(), number_of_stats_).asDiagonal();
   b_ = Eigen::Map<Eigen::VectorXd>(diag_elements_b.data(), number_of_velocities_).asDiagonal();
   jacob_phi_ = Eigen::MatrixXd::Identity(number_of_stats_, number_of_velocities_);
+  phi_dot_.resize(number_of_stats_);
 
   std::random_device rd;
   std::mt19937 generator(rd());
@@ -61,10 +62,9 @@ AgentCore::AgentCore() {
   private_node_handle_->param("x", pose_.position.x, distrib_position(generator));
   private_node_handle_->param("y", pose_.position.y, distrib_position(generator));
   private_node_handle_->param("theta", theta, distrib_orientation(generator));
+  pose_.orientation.w = 1;  // TODO: normalize
   setTheta(pose_.orientation, theta);
-  pose_virtual_.position.x = pose_.position.x;
-  pose_virtual_.position.y = pose_.position.y;
-  setTheta(pose_virtual_.orientation, theta);
+  pose_virtual_ = pose_;
 
   std::vector<double> target_statistics;
   const std::vector<double> DEFAULT_TARGET_STATS = {0, 0, 1, 0, 1};
@@ -104,7 +104,7 @@ void AgentCore::algorithmCallback(const ros::TimerEvent &timer_event) {
   consensus();
   // publishes the new 'estimated_statistics_' evaluated in the consensus method
   agent_test::FormationStatisticsStamped msg;
-  msg.header.frame_id = agent_id_;
+  msg.header.frame_id = std::to_string(agent_id_);
   msg.header.stamp = ros::Time::now();
   msg.stats = estimated_statistics_;
   stats_publisher_.publish(msg);
@@ -130,17 +130,16 @@ void AgentCore::consensus() {
   x += phi_dot_*sample_time_ + (x_j.rowwise() - x).colwise().sum()*sample_time_;
 
   estimated_statistics_ = statsVectorToMsg(x);
-
-  ROS_DEBUG_STREAM("[AgentCore::consensus] Estimated statistics:\n" << x);
+  ROS_DEBUG_STREAM("[AgentCore::consensus] Estimated statistics: [" << x << "].");
 }
 
 void AgentCore::control() {
   Eigen::VectorXd stats_error = statsMsgToVector(target_statistics_) - statsMsgToVector(estimated_statistics_);
   // update non constant values of the jacobian of phi(p) = [px, py, pxx, pxy, pyy]
-  jacob_phi_(3,1) = 2*pose_virtual_.position.x;
-  jacob_phi_(4,1) = pose_virtual_.position.y;
-  jacob_phi_(4,2) = pose_virtual_.position.x;
-  jacob_phi_(5,2) = 2*pose_virtual_.position.y;
+  jacob_phi_(2,0) = 2*pose_virtual_.position.x;
+  jacob_phi_(3,0) = pose_virtual_.position.y;
+  jacob_phi_(3,1) = pose_virtual_.position.x;
+  jacob_phi_(4,1) = 2*pose_virtual_.position.y;
 
   // twist_virtual = inv(B + Jphi'*lambda*Jphi) * Jphi' * gamma * stats_error
   Eigen::VectorXd control_law = (b_ + jacob_phi_.transpose()*lambda_*jacob_phi_).inverse()
@@ -180,10 +179,15 @@ void AgentCore::dynamics() {
   ROS_DEBUG_STREAM("[AgentCore::dynamics] Agent twist (x: " << twist_.linear.x << ", y: " << twist_.linear.y << ")");
 }
 
-double AgentCore::getTheta(const geometry_msgs::Quaternion &quat) {
+Eigen::Vector3d AgentCore::getRPY(const geometry_msgs::Quaternion &quat) {
   Eigen::Quaterniond eigen_quat;
   tf::quaternionMsgToEigen(quat, eigen_quat);
   Eigen::Vector3d rpy = eigen_quat.normalized().matrix().eulerAngles(0, 1, 2);
+  return rpy;
+}
+
+double AgentCore::getTheta(const geometry_msgs::Quaternion &quat) {
+  Eigen::Vector3d rpy = getRPY(quat);
   return rpy(2);
 }
 
@@ -230,22 +234,21 @@ double AgentCore::saturation(const double &value, const double &min, const doubl
 }
 
 void AgentCore::setTheta(geometry_msgs::Quaternion &quat, const double &theta) {
-  Eigen::Quaterniond eigen_quat;
-  tf::quaternionMsgToEigen(quat, eigen_quat);
-  Eigen::Vector3d rpy = eigen_quat.normalized().matrix().eulerAngles(0, 1, 2);
-
-  eigen_quat = Eigen::AngleAxisd(rpy(0), Eigen::Vector3d::UnitX())
-               * Eigen::AngleAxisd(rpy(1), Eigen::Vector3d::UnitY())
-               * Eigen::AngleAxisd(theta, Eigen::Vector3d::UnitZ());
-
+  Eigen::Vector3d rpy = getRPY(quat);
+  Eigen::Quaterniond eigen_quat = Eigen::AngleAxisd(rpy(0), Eigen::Vector3d::UnitX())
+                                  * Eigen::AngleAxisd(rpy(1), Eigen::Vector3d::UnitY())
+                                  * Eigen::AngleAxisd(theta, Eigen::Vector3d::UnitZ());
   tf::quaternionEigenToMsg(eigen_quat, quat);
+  ROS_DEBUG_STREAM("[AgentCore::setTheta] Quaternion updated (theta " << theta << "): [" << quat.x << ", " << quat.y
+                   << ", " << quat.z << ", " << quat.w << "].");
 }
 
 Eigen::MatrixXd AgentCore::statsMsgToMatrix(const std::vector<agent_test::FormationStatistics> &msg) {
-  Eigen::MatrixXd matrix(number_of_stats_, number_of_stats_);
-  for (int i=0; i<number_of_stats_; i++) {
+  Eigen::MatrixXd matrix = Eigen::MatrixXd::Zero(msg.size(), number_of_stats_);
+  for (int i=0; i<msg.size(); i++) {
     matrix.row(i) = statsMsgToVector(msg.at(i));
   }
+  ROS_DEBUG_STREAM("[AgentCore::statsMsgToMatrix] Received statistics:  [" << matrix << "].");
   return matrix;
 }
 

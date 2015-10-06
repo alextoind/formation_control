@@ -138,6 +138,7 @@ class AgentCore {
   double integrator(const double &out_old, const double &in_old, const double &in_new, const double &k);
   double saturation(const double &value, const double &min, const double &max);
 
+  Eigen::Vector3d getRPY(const geometry_msgs::Quaternion &quat);
   double getTheta(const geometry_msgs::Quaternion &quat);
   void setTheta(geometry_msgs::Quaternion &quat, const double &theta);
 

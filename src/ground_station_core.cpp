@@ -46,6 +46,7 @@ void GroundStationCore::algorithmCallback(const ros::TimerEvent &timer_event) {
   msg.neighbours_ = connected_agents_;
   msg.vector = shared_statistics_grouped_;
   stats_publisher_.publish(msg);
+  ROS_DEBUG_STREAM("[GroundStationCore::algorithmCallback] Message published.");
 
   // clears the private variable for following callbacks
   shared_statistics_grouped_.clear();
@@ -66,6 +67,7 @@ int GroundStationCore::extractFirstID() {
   }
   ROS_ERROR_STREAM("[GroundStationCore::extractFirstID] Can't find a valid ID: check the current number of agents ("
                    << number_of_agents_ << ").");
+  return -1;
 }
 
 void GroundStationCore::sharedStatsCallback(const agent_test::FormationStatisticsStamped &shared) {
@@ -80,12 +82,12 @@ agent_test::FormationStatisticsStamped GroundStationCore::statsVectorToMsg(const
     return msg;
   }
   msg.header.stamp = ros::Time::now();
-  msg.header.frame_id = id;
-  msg.stats.m_x = vector.at(1);
-  msg.stats.m_y = vector.at(2);
-  msg.stats.m_xx = vector.at(3);
-  msg.stats.m_xy = vector.at(4);
-  msg.stats.m_yy = vector.at(5);
+  msg.header.frame_id = std::to_string(id);
+  msg.stats.m_x = vector.at(0);
+  msg.stats.m_y = vector.at(1);
+  msg.stats.m_xx = vector.at(2);
+  msg.stats.m_xy = vector.at(3);
+  msg.stats.m_yy = vector.at(4);
 
   return msg;
 }
@@ -93,11 +95,10 @@ agent_test::FormationStatisticsStamped GroundStationCore::statsVectorToMsg(const
 bool GroundStationCore::syncAgentCallback(agent_test::Sync::Request &request, agent_test::Sync::Response &response) {
   // initializes the synchronization time only at the first callback
   if (sync_time_.isZero()) {
-    sync_time_ = ros::Time::now() + sync_delay_ + ros::Duration(sample_time_/4);  // agent nodes start a bit after GS
+    sync_time_ = ros::Time::now() + sync_delay_;
   }
-
   response.new_id = (request.agent_id == 0 || checkCollision(request.agent_id)) ? extractFirstID() : request.agent_id;
-  response.sync_time = sync_time_;
+  response.sync_time = sync_time_ + ros::Duration(sample_time_/4);  // agent nodes start a bit after GS
   connected_agents_.push_back(response.new_id);
   shared_statistics_grouped_.push_back(statsVectorToMsg(response.new_id, std::vector<double>({0,0,0,0,0})));
   return true;
