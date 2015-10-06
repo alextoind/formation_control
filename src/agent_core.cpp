@@ -62,7 +62,7 @@ AgentCore::AgentCore() {
   private_node_handle_->param("x", pose_.position.x, distrib_position(generator));
   private_node_handle_->param("y", pose_.position.y, distrib_position(generator));
   private_node_handle_->param("theta", theta, distrib_orientation(generator));
-  pose_.orientation.w = 1;  // TODO: normalize
+  pose_.orientation.w = 1;
   setTheta(pose_.orientation, theta);
   pose_virtual_ = pose_;
 
@@ -79,7 +79,12 @@ AgentCore::AgentCore() {
   private_node_handle_->param("shared_stats_topic", shared_stats_topic_name_, std::string(DEFAULT_SHARED_STATS_TOPIC));
   private_node_handle_->param("received_stats_topic", received_stats_topic_name_, std::string(DEFAULT_RECEIVED_STATS_TOPIC));
   private_node_handle_->param("target_stats_topic", target_stats_topic_name_, std::string(DEFAULT_TARGET_STATS_TOPIC));
-  private_node_handle_->param("sync_service_name", sync_service_name_, std::string(DEFAULT_SYNC_SERVICE_NAME));
+  private_node_handle_->param("sync_service", sync_service_name_, std::string(DEFAULT_SYNC_SERVICE));
+  private_node_handle_->param("path_topic", path_topic_name_, std::string(DEFAULT_PATH_TOPIC));
+  private_node_handle_->param("path_virtual_topic", path_virtual_topic_name_, std::string(DEFAULT_PATH_VIRTUAL_TOPIC));
+  private_node_handle_->param("path_max_length", path_max_length_, DEFAULT_PATH_MAX_LENGTH);
+  private_node_handle_->param("fixed_frame", fixed_frame_, std::string(DEFAULT_FIXED_FRAME));
+  private_node_handle_->param("frame_base_name", frame_base_name_, std::string(DEFAULT_FRAME_BASE_NAME));
   double sync_timeout;
   private_node_handle_->param("sync_timeout", sync_timeout, (double)DEFAULT_SYNC_TIMEOUT);
   sync_timeout_ = ros::Duration(sync_timeout);
@@ -88,6 +93,9 @@ AgentCore::AgentCore() {
   stats_subscriber_ = node_handle_.subscribe(received_stats_topic_name_, topic_queue_length_, &AgentCore::receivedStatsCallback, this);
   target_stats_subscriber_ = node_handle_.subscribe(target_stats_topic_name_, topic_queue_length_, &AgentCore::targetStatsCallback, this);
   sync_client_ = node_handle_.serviceClient<agent_test::Sync>(sync_service_name_);
+
+  path_publisher_ = node_handle_.advertise<nav_msgs::Path>(path_topic_name_, topic_queue_length_);
+  path_virtual_publisher_ = node_handle_.advertise<nav_msgs::Path>(path_virtual_topic_name_, topic_queue_length_);
 
   waitForSyncTime();
 
@@ -101,17 +109,10 @@ AgentCore::~AgentCore() {
 // TODO: extend the algorithm to work in 3D even if our approximation is in 2D
 
 void AgentCore::algorithmCallback(const ros::TimerEvent &timer_event) {
-  consensus();
-  // publishes the new 'estimated_statistics_' evaluated in the consensus method
-  agent_test::FormationStatisticsStamped msg;
-  msg.header.frame_id = std::to_string(agent_id_);
-  msg.header.stamp = ros::Time::now();
-  msg.stats = estimated_statistics_;
-  stats_publisher_.publish(msg);
-
-  control();
+  consensus();  // also publishes estimated statistics
+  control();  // also publishes virtual agent pose and path
   guidance();
-  dynamics();
+  dynamics();  // also publishes agent pose and path
 }
 
 void AgentCore::consensus() {
@@ -131,6 +132,12 @@ void AgentCore::consensus() {
 
   estimated_statistics_ = statsVectorToMsg(x);
   ROS_DEBUG_STREAM("[AgentCore::consensus] Estimated statistics: [" << x << "].");
+
+  agent_test::FormationStatisticsStamped msg;
+  msg.header.frame_id = agent_frame_;
+  msg.header.stamp = ros::Time::now();
+  msg.stats = estimated_statistics_;
+  stats_publisher_.publish(msg);
 }
 
 void AgentCore::control() {
@@ -160,6 +167,9 @@ void AgentCore::control() {
                    << ", y: " << pose_virtual_.position.y << ")");
   ROS_DEBUG_STREAM("[AgentCore::control] Virtual agent twist (x: " << twist_virtual_.linear.x
                    << ", y: " << twist_virtual_.linear.y << ")");
+
+  broadcastPose(pose_virtual_, agent_virtual_frame_);
+  broadcastPath(pose_virtual_, path_virtual_, path_virtual_publisher_);
 }
 
 void AgentCore::dynamics() {
@@ -177,6 +187,9 @@ void AgentCore::dynamics() {
 
   ROS_DEBUG_STREAM("[AgentCore::dynamics] Agent pose (x: " << pose_.position.x << ", y: " << pose_.position.y << ")");
   ROS_DEBUG_STREAM("[AgentCore::dynamics] Agent twist (x: " << twist_.linear.x << ", y: " << twist_.linear.y << ")");
+
+  broadcastPose(pose_, agent_frame_);
+  broadcastPath(pose_, path_, path_publisher_);
 }
 
 Eigen::Vector3d AgentCore::getRPY(const geometry_msgs::Quaternion &quat) {
@@ -222,7 +235,8 @@ void AgentCore::receivedStatsCallback(const agent_test::FormationStatisticsArray
   }
   neighbours_ = received.neighbours_;  // updates current neighbourhood
   for (auto const &data : received.vector) {
-    if (std::find(std::begin(neighbours_), std::end(neighbours_), std::stoi(data.header.frame_id)) != std::end(neighbours_)) {
+    int id = std::stoi(data.header.frame_id.substr(frame_base_name_.size()));
+    if (std::find(std::begin(neighbours_), std::end(neighbours_), id) != std::end(neighbours_)) {
       received_statistics_.push_back(data.stats);
     }
   }
@@ -286,16 +300,49 @@ void AgentCore::targetStatsCallback(const agent_test::FormationStatistics &targe
                    << target.m_xx << ", Mxy=" << target.m_xy << ", Myy=" << target.m_yy);
 }
 
+void AgentCore::updatePath(const geometry_msgs::PoseStamped &pose, std::vector<geometry_msgs::PoseStamped> &path) {
+
+}
+
 void AgentCore::waitForSyncTime() {
   sync_client_.waitForExistence(sync_timeout_);
   agent_test::Sync srv;
   srv.request.agent_id = agent_id_;
+  srv.request.frame_base_name = frame_base_name_;
   if (sync_client_.call(srv)) {
     agent_id_ = srv.response.new_id;  // always update, even if it does not change
+    agent_frame_ = frame_base_name_ + std::to_string(agent_id_);
+    agent_virtual_frame_ = agent_frame_ + "_virtual";
+
     ROS_DEBUG_STREAM("[AgentCore::waitForSyncTime] Wait for synchronization deadline (" << srv.response.sync_time << ")");
     ros::Time::sleepUntil(srv.response.sync_time);
   }
   else {
     ROS_ERROR_STREAM("[AgentCore::waitForSyncTime] Can't get synchronization time from the server (Ground Station)");
   }
+}
+
+void AgentCore::broadcastPath(const geometry_msgs::Pose &pose, std::vector<geometry_msgs::PoseStamped> &path,
+                              const ros::Publisher &publisher) {
+  geometry_msgs::PoseStamped pose_msg;
+  pose_msg.header.frame_id = fixed_frame_;
+  pose_msg.header.stamp = ros::Time::now();
+  pose_msg.pose = pose;
+
+  path.push_back(pose_msg);
+  if (path.size() > path_max_length_) {
+    path.erase(path.begin());
+  }
+
+  nav_msgs::Path msg;
+  msg.header.frame_id = fixed_frame_;
+  msg.header.stamp = ros::Time::now();
+  msg.poses = path;
+  publisher.publish(msg);
+}
+
+void AgentCore::broadcastPose(const geometry_msgs::Pose &pose, const std::string &frame) {
+  tf::Pose p;
+  tf::poseMsgToTF(pose, p);
+  tf_broadcaster_.sendTransform(tf::StampedTransform(p, ros::Time(0), fixed_frame_, frame));
 }

@@ -1,5 +1,6 @@
 # current agent ID
 int32 agent_id
+string frame_base_name
 ---
 # ROS time to wait for swarm synchronization
 time sync_time

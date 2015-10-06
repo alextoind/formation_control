@@ -1,6 +1,8 @@
 <launch>
   <env name="ROSCONSOLE_CONFIG_FILE" value="$(find agent_test)/config/rosconsole_debug_enabled.conf"/>
 
+  <node pkg="tf" type="static_transform_publisher" name="fixed_frame_pub" args="0.0 0.0 0.0 0.0 0.0 0.0 map child 100" />
+
   <arg name="number_of_agents" default="2"/>
   <node pkg="agent_test" type="ground_station_test" name="ground_station" output="screen" cwd="ROS_HOME">
     <param name="number_of_agents" type="int" value="$(arg number_of_agents)" />
@@ -11,8 +13,8 @@
     <param name="agent_id" type="int" value="$(arg id_1)" />
   </node>
 
-  <arg name="id_2" default="2"/>
+  <!--<arg name="id_2" default="2"/>
   <node pkg="agent_test" type="agent_test" name="agent_$(arg id_2)" output="screen" cwd="ROS_HOME">
     <param name="agent_id" type="int" value="$(arg id_2)" />
-  </node>
+  </node>-->
 </launch>

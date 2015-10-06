@@ -30,6 +30,9 @@
 #include <geometry_msgs/Pose.h>
 #include <Eigen/Dense>
 #include <eigen_conversions/eigen_msg.h>
+#include <nav_msgs/Path.h>
+#include <tf/transform_broadcaster.h>
+#include <tf/transform_datatypes.h>
 // Auto-generated from msg/ directory libraries
 #include "agent_test/FormationStatistics.h"
 #include "agent_test/FormationStatisticsStamped.h"
@@ -55,8 +58,16 @@
 #define DEFAULT_SHARED_STATS_TOPIC "shared_stats"
 #define DEFAULT_RECEIVED_STATS_TOPIC "received_stats"
 #define DEFAULT_TARGET_STATS_TOPIC "target_stats"
-#define DEFAULT_SYNC_SERVICE_NAME "sync_agent"
+#define DEFAULT_SYNC_SERVICE "sync_agent"
 #define DEFAULT_SYNC_TIMEOUT 10.0  // expressed in seconds
+#define DEFAULT_PATH_TOPIC "agent_paths"
+#define DEFAULT_PATH_VIRTUAL_TOPIC "virtual_agent_paths"
+#define DEFAULT_PATH_MAX_LENGTH 100  // maximum number of poses to be stored in the path
+#define DEFAULT_FIXED_FRAME "map"
+#define DEFAULT_FRAME_BASE_NAME "agent_"
+
+// TODO add a debug verbosity level and improve debug messages
+
 
 class AgentCore {
  public:
@@ -71,6 +82,20 @@ class AgentCore {
   ros::Subscriber target_stats_subscriber_;
   ros::Timer algorithm_timer_;
   ros::ServiceClient sync_client_;
+  tf::TransformBroadcaster tf_broadcaster_;
+
+  ros::Publisher path_publisher_;
+  ros::Publisher path_virtual_publisher_;
+  std::string path_topic_name_;
+  std::string path_virtual_topic_name_;
+
+  std::vector<geometry_msgs::PoseStamped> path_;
+  std::vector<geometry_msgs::PoseStamped> path_virtual_;
+  int path_max_length_;
+  std::string fixed_frame_;
+  std::string frame_base_name_;
+  std::string agent_frame_;
+  std::string agent_virtual_frame_;
 
   int topic_queue_length_;
   std::string shared_stats_topic_name_;
@@ -143,6 +168,12 @@ class AgentCore {
   void setTheta(geometry_msgs::Quaternion &quat, const double &theta);
 
   void waitForSyncTime();
+
+  void updatePath(const geometry_msgs::PoseStamped &pose, std::vector<geometry_msgs::PoseStamped> &path);
+
+  void broadcastPath(const geometry_msgs::Pose &pose, std::vector<geometry_msgs::PoseStamped> &path,
+                     const ros::Publisher &publisher);
+  void broadcastPose(const geometry_msgs::Pose &pose, const std::string &frame);
 };
 
 #endif

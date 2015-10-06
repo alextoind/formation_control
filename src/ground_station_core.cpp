@@ -21,8 +21,8 @@ GroundStationCore::GroundStationCore() {
   private_node_handle_->param("topic_queue_length", topic_queue_length_, DEFAULT_TOPIC_QUEUE_LENGTH);
   private_node_handle_->param("shared_stats_topic", shared_stats_topic_name_, std::string(DEFAULT_SHARED_STATS_TOPIC));
   private_node_handle_->param("received_stats_topic", received_stats_topic_name_, std::string(DEFAULT_RECEIVED_STATS_TOPIC));
-  private_node_handle_->param("sync_service_name", sync_service_name_, std::string(DEFAULT_SYNC_SERVICE_NAME));
-  private_node_handle_->param("ground_station_id", ground_station_id_, std::string(DEFAULT_GROUND_STATION_ID));
+  private_node_handle_->param("sync_service_name", sync_service_name_, std::string(DEFAULT_SYNC_SERVICE));
+  private_node_handle_->param("ground_station_frame", ground_station_frame_, std::string(DEFAULT_GROUND_STATION_FRAME));
   private_node_handle_->param("number_of_agents", number_of_agents_, DEFAULT_NUMBER_OF_AGENTS);
   double sync_delay;
   private_node_handle_->param("sync_delay", sync_delay, (double)DEFAULT_SYNC_DELAY);
@@ -41,7 +41,7 @@ GroundStationCore::~GroundStationCore() {
 
 void GroundStationCore::algorithmCallback(const ros::TimerEvent &timer_event) {
   agent_test::FormationStatisticsArray msg;
-  msg.header.frame_id = ground_station_id_;
+  msg.header.frame_id = ground_station_frame_;
   msg.header.stamp = ros::Time::now();
   msg.neighbours_ = connected_agents_;
   msg.vector = shared_statistics_grouped_;
@@ -72,17 +72,17 @@ int GroundStationCore::extractFirstID() {
 
 void GroundStationCore::sharedStatsCallback(const agent_test::FormationStatisticsStamped &shared) {
   shared_statistics_grouped_.push_back(shared);
-  ROS_DEBUG_STREAM("[GroundStationCore::sharedStatsCallback] Received statistics from agent id " << shared.header.frame_id);
+  ROS_DEBUG_STREAM("[GroundStationCore::sharedStatsCallback] Received statistics " << shared.header.frame_id);
 }
 
-agent_test::FormationStatisticsStamped GroundStationCore::statsVectorToMsg(const int &id, const std::vector<double> &vector) {
+agent_test::FormationStatisticsStamped GroundStationCore::statsVectorToMsg(const std::string &frame, const std::vector<double> &vector) {
   agent_test::FormationStatisticsStamped msg;
   if (vector.size() != 5) {
     ROS_ERROR_STREAM("[AgentCore::statsVectorToMsg] Wrong statistics vector size (" << vector.size() << ")");
     return msg;
   }
   msg.header.stamp = ros::Time::now();
-  msg.header.frame_id = std::to_string(id);
+  msg.header.frame_id = frame;
   msg.stats.m_x = vector.at(0);
   msg.stats.m_y = vector.at(1);
   msg.stats.m_xx = vector.at(2);
@@ -100,7 +100,8 @@ bool GroundStationCore::syncAgentCallback(agent_test::Sync::Request &request, ag
   response.new_id = (request.agent_id == 0 || checkCollision(request.agent_id)) ? extractFirstID() : request.agent_id;
   response.sync_time = sync_time_ + ros::Duration(sample_time_/4);  // agent nodes start a bit after GS
   connected_agents_.push_back(response.new_id);
-  shared_statistics_grouped_.push_back(statsVectorToMsg(response.new_id, std::vector<double>({0,0,0,0,0})));
+  shared_statistics_grouped_.push_back(statsVectorToMsg(request.frame_base_name + std::to_string(response.new_id),
+                                                        std::vector<double>({0,0,0,0,0})));
   return true;
 }
 
