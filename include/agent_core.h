@@ -146,7 +146,7 @@ class AgentCore {
   double world_limit_;
 
 
-  void targetStatsCallback(const agent_test::FormationStatistics &target);
+  void targetStatsCallback(const agent_test::FormationStatisticsStamped &target);
   void receivedStatsCallback(const agent_test::FormationStatisticsArray &received);
   void algorithmCallback(const ros::TimerEvent &timer_event);
 
@@ -168,8 +168,6 @@ class AgentCore {
   void setTheta(geometry_msgs::Quaternion &quat, const double &theta);
 
   void waitForSyncTime();
-
-  void updatePath(const geometry_msgs::PoseStamped &pose, std::vector<geometry_msgs::PoseStamped> &path);
 
   void broadcastPath(const geometry_msgs::Pose &pose, std::vector<geometry_msgs::PoseStamped> &path,
                      const ros::Publisher &publisher);

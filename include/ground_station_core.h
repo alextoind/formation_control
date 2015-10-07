@@ -42,6 +42,7 @@
 #define DEFAULT_TOPIC_QUEUE_LENGTH 1
 #define DEFAULT_SHARED_STATS_TOPIC "shared_stats"
 #define DEFAULT_RECEIVED_STATS_TOPIC "received_stats"
+#define DEFAULT_TARGET_STATS_TOPIC "target_stats"
 #define DEFAULT_SYNC_SERVICE "sync_agent"
 #define DEFAULT_GROUND_STATION_FRAME "ground_station"
 #define DEFAULT_NUMBER_OF_AGENTS 1
@@ -69,9 +70,11 @@ class GroundStationCore {
   int topic_queue_length_;
   std::string shared_stats_topic_name_;
   std::string received_stats_topic_name_;
+  std::string target_stats_topic_name_;
   std::string sync_service_name_;
   std::string ground_station_frame_;
 
+  agent_test::FormationStatistics target_statistics_;
   std::vector<agent_test::FormationStatisticsStamped> shared_statistics_grouped_;
   std::vector<int> connected_agents_;  // TODO add critical failure handler
 
@@ -85,6 +88,7 @@ class GroundStationCore {
   bool checkCollision(const int &id);
   int extractFirstID();
 
+  agent_test::FormationStatistics statsVectorToMsg(const std::vector<double> &vector);
   agent_test::FormationStatisticsStamped statsVectorToMsg(const std::string &frame, const std::vector <double> &vector);
 };
 

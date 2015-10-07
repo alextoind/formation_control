@@ -33,19 +33,15 @@ AgentCore::AgentCore() {
   private_node_handle_->param("vehicle_length", vehicle_length_, (double)DEFAULT_VEHICLE_LENGTH);
   private_node_handle_->param("world_limit", world_limit_, (double)DEFAULT_WORLD_LIMIT);
 
-  const Eigen::VectorXd ONES_STATS = Eigen::VectorXd::Ones(number_of_stats_);
-  const std::vector<double> STD_ONES_STATS(ONES_STATS.data(), ONES_STATS.data() + ONES_STATS.size());
-  const Eigen::VectorXd ZEROS_STATS = Eigen::VectorXd::Zero(number_of_stats_);
-  const std::vector<double> STD_ZEROS_STATS(ZEROS_STATS.data(), ZEROS_STATS.data() + ZEROS_STATS.size());
-  const Eigen::VectorXd ONES_VELOCITIES = Eigen::VectorXd::Ones(number_of_velocities_);
-  const std::vector<double> STD_ONES_VELOCITIES(ONES_VELOCITIES.data(), ONES_VELOCITIES.data() + ONES_VELOCITIES.size());
-
+  const std::vector<double> DEFAULT_DIAG_ELEMENTS_GAMMA = {100, 100, 0.1, 0.1, 0.1};
+  const std::vector<double> DEFAULT_DIAG_ELEMENTS_LAMBDA = {0, 0, 0, 0, 0};
+  const std::vector<double> DEFAULT_DIAG_ELEMENTS_B = {100, 100};
   std::vector<double> diag_elements_gamma;
   std::vector<double> diag_elements_lambda;
   std::vector<double> diag_elements_b;
-  private_node_handle_->param("diag_elements_gamma", diag_elements_gamma, STD_ONES_STATS);
-  private_node_handle_->param("diag_elements_lambda", diag_elements_lambda, STD_ZEROS_STATS);
-  private_node_handle_->param("diag_elements_b", diag_elements_b, STD_ONES_VELOCITIES);
+  private_node_handle_->param("diag_elements_gamma", diag_elements_gamma, DEFAULT_DIAG_ELEMENTS_GAMMA);
+  private_node_handle_->param("diag_elements_lambda", diag_elements_lambda, DEFAULT_DIAG_ELEMENTS_LAMBDA);
+  private_node_handle_->param("diag_elements_b", diag_elements_b, DEFAULT_DIAG_ELEMENTS_B);
 
   gamma_ = Eigen::Map<Eigen::VectorXd>(diag_elements_gamma.data(), number_of_stats_).asDiagonal();
   lambda_ = Eigen::Map<Eigen::VectorXd>(diag_elements_lambda.data(), number_of_stats_).asDiagonal();
@@ -65,11 +61,6 @@ AgentCore::AgentCore() {
   pose_.orientation.w = 1;
   setTheta(pose_.orientation, theta);
   pose_virtual_ = pose_;
-
-  std::vector<double> target_statistics;
-  const std::vector<double> DEFAULT_TARGET_STATS = {0, 0, 1, 0, 1};
-  private_node_handle_->param("target_statistics", target_statistics, DEFAULT_TARGET_STATS);
-  target_statistics_ = statsVectorToMsg(target_statistics);
 
   std::vector<double> initial_estimation = {pose_.position.x, pose_.position.y, std::pow(pose_.position.x, 2),
                                             pose_.position.x * pose_.position.y, std::pow(pose_.position.y, 2)};
@@ -100,7 +91,7 @@ AgentCore::AgentCore() {
   waitForSyncTime();
 
   algorithm_timer_ = private_node_handle_->createTimer(ros::Duration(sample_time_), &AgentCore::algorithmCallback, this);
-}
+};
 
 AgentCore::~AgentCore() {
   delete private_node_handle_;
@@ -113,6 +104,31 @@ void AgentCore::algorithmCallback(const ros::TimerEvent &timer_event) {
   control();  // also publishes virtual agent pose and path
   guidance();
   dynamics();  // also publishes agent pose and path
+}
+
+void AgentCore::broadcastPath(const geometry_msgs::Pose &pose, std::vector<geometry_msgs::PoseStamped> &path,
+                              const ros::Publisher &publisher) {
+  geometry_msgs::PoseStamped pose_msg;
+  pose_msg.header.frame_id = fixed_frame_;
+  pose_msg.header.stamp = ros::Time::now();
+  pose_msg.pose = pose;
+
+  path.push_back(pose_msg);
+  if (path.size() > path_max_length_) {
+    path.erase(path.begin());
+  }
+
+  nav_msgs::Path msg;
+  msg.header.frame_id = fixed_frame_;
+  msg.header.stamp = ros::Time::now();
+  msg.poses = path;
+  publisher.publish(msg);
+}
+
+void AgentCore::broadcastPose(const geometry_msgs::Pose &pose, const std::string &frame) {
+  tf::Pose p;
+  tf::poseMsgToTF(pose, p);
+  tf_broadcaster_.sendTransform(tf::StampedTransform(p, ros::Time::now(), fixed_frame_, frame));
 }
 
 void AgentCore::consensus() {
@@ -160,6 +176,7 @@ void AgentCore::control() {
 
   pose_virtual_.position.x = integrator(pose_virtual_.position.x, twist_virtual_.linear.x, control_law(0), 1);
   pose_virtual_.position.y = integrator(pose_virtual_.position.y, twist_virtual_.linear.y, control_law(1), 1);
+  setTheta(pose_virtual_.orientation, std::atan2(control_law(1), control_law(0)));
   twist_virtual_.linear.x = control_law(0);
   twist_virtual_.linear.y = control_law(1);
 
@@ -292,16 +309,12 @@ agent_test::FormationStatistics AgentCore::statsVectorToMsg(const std::vector<do
   return statsVectorToMsg(Eigen::Map<Eigen::VectorXd>(v.data(), v.size()));
 }
 
-void AgentCore::targetStatsCallback(const agent_test::FormationStatistics &target) {
-  target_statistics_ = target;
+void AgentCore::targetStatsCallback(const agent_test::FormationStatisticsStamped &target) {
+  target_statistics_ = target.stats;
 
   ROS_INFO_STREAM("[AgentCore::targetStatsCallback] Target statistics has been changed.");
-  ROS_DEBUG_STREAM("[AgentCore::targetStatsCallback] New values: Mx=" << target.m_x << ", My=" << target.m_y << ", Mxx="
-                   << target.m_xx << ", Mxy=" << target.m_xy << ", Myy=" << target.m_yy);
-}
-
-void AgentCore::updatePath(const geometry_msgs::PoseStamped &pose, std::vector<geometry_msgs::PoseStamped> &path) {
-
+  ROS_DEBUG_STREAM("[AgentCore::targetStatsCallback] New values: Mx=" << target.stats.m_x << ", My=" << target.stats.m_y
+                   << ", Mxx=" << target.stats.m_xx << ", Mxy=" << target.stats.m_xy << ", Myy=" << target.stats.m_yy);
 }
 
 void AgentCore::waitForSyncTime() {
@@ -320,29 +333,4 @@ void AgentCore::waitForSyncTime() {
   else {
     ROS_ERROR_STREAM("[AgentCore::waitForSyncTime] Can't get synchronization time from the server (Ground Station)");
   }
-}
-
-void AgentCore::broadcastPath(const geometry_msgs::Pose &pose, std::vector<geometry_msgs::PoseStamped> &path,
-                              const ros::Publisher &publisher) {
-  geometry_msgs::PoseStamped pose_msg;
-  pose_msg.header.frame_id = fixed_frame_;
-  pose_msg.header.stamp = ros::Time::now();
-  pose_msg.pose = pose;
-
-  path.push_back(pose_msg);
-  if (path.size() > path_max_length_) {
-    path.erase(path.begin());
-  }
-
-  nav_msgs::Path msg;
-  msg.header.frame_id = fixed_frame_;
-  msg.header.stamp = ros::Time::now();
-  msg.poses = path;
-  publisher.publish(msg);
-}
-
-void AgentCore::broadcastPose(const geometry_msgs::Pose &pose, const std::string &frame) {
-  tf::Pose p;
-  tf::poseMsgToTF(pose, p);
-  tf_broadcaster_.sendTransform(tf::StampedTransform(p, ros::Time(0), fixed_frame_, frame));
 }
