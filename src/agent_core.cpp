@@ -33,9 +33,9 @@ AgentCore::AgentCore() {
   private_node_handle_->param("vehicle_length", vehicle_length_, (double)DEFAULT_VEHICLE_LENGTH);
   private_node_handle_->param("world_limit", world_limit_, (double)DEFAULT_WORLD_LIMIT);
 
-  const std::vector<double> DEFAULT_DIAG_ELEMENTS_GAMMA = {100, 100, 0.1, 0.1, 0.1};
+  const std::vector<double> DEFAULT_DIAG_ELEMENTS_GAMMA = {500, 500, 5, 5, 5};
   const std::vector<double> DEFAULT_DIAG_ELEMENTS_LAMBDA = {0, 0, 0, 0, 0};
-  const std::vector<double> DEFAULT_DIAG_ELEMENTS_B = {100, 100};
+  const std::vector<double> DEFAULT_DIAG_ELEMENTS_B = {500, 500};
   std::vector<double> diag_elements_gamma;
   std::vector<double> diag_elements_lambda;
   std::vector<double> diag_elements_b;
@@ -97,8 +97,6 @@ AgentCore::~AgentCore() {
   delete private_node_handle_;
 }
 
-// TODO: extend the algorithm to work in 3D even if our approximation is in 2D
-
 void AgentCore::algorithmCallback(const ros::TimerEvent &timer_event) {
   consensus();  // also publishes estimated statistics
   control();  // also publishes virtual agent pose and path
@@ -150,13 +148,14 @@ void AgentCore::consensus() {
   ROS_DEBUG_STREAM("[AgentCore::consensus] Estimated statistics: [" << x << "].");
 
   agent_test::FormationStatisticsStamped msg;
-  msg.header.frame_id = agent_frame_;
+  msg.header.frame_id = agent_virtual_frame_;
   msg.header.stamp = ros::Time::now();
+  msg.agent_id = agent_id_;
   msg.stats = estimated_statistics_;
   stats_publisher_.publish(msg);
 }
 
-void AgentCore::control() {
+void AgentCore::control() {  // TODO fix
   Eigen::VectorXd stats_error = statsMsgToVector(target_statistics_) - statsMsgToVector(estimated_statistics_);
   // update non constant values of the jacobian of phi(p) = [px, py, pxx, pxy, pyy]
   jacob_phi_(2,0) = 2*pose_virtual_.position.x;
@@ -186,7 +185,7 @@ void AgentCore::control() {
                    << ", y: " << twist_virtual_.linear.y << ")");
 
   broadcastPose(pose_virtual_, agent_virtual_frame_);
-  broadcastPath(pose_virtual_, path_virtual_, path_virtual_publisher_);
+  broadcastPath(pose_virtual_, path_virtual_, path_virtual_publisher_);  // TODO use Marker instead of Path
 }
 
 void AgentCore::dynamics() {
@@ -206,7 +205,7 @@ void AgentCore::dynamics() {
   ROS_DEBUG_STREAM("[AgentCore::dynamics] Agent twist (x: " << twist_.linear.x << ", y: " << twist_.linear.y << ")");
 
   broadcastPose(pose_, agent_frame_);
-  broadcastPath(pose_, path_, path_publisher_);
+  broadcastPath(pose_, path_, path_publisher_);  // TODO use Marker instead of Path
 }
 
 Eigen::Vector3d AgentCore::getRPY(const geometry_msgs::Quaternion &quat) {
@@ -221,7 +220,7 @@ double AgentCore::getTheta(const geometry_msgs::Quaternion &quat) {
   return rpy(2);
 }
 
-void AgentCore::guidance() {
+void AgentCore::guidance() {  // TODO fix
   los_distance_ = std::sqrt(std::pow(pose_virtual_.position.x - pose_.position.x, 2)
                             + std::pow(pose_virtual_.position.y - pose_.position.y, 2));
   // std::atan2 automatically handle the los_distance_ == 0 case >> los_angle_ = 0 TODO: try with velocty instead of position
@@ -252,8 +251,7 @@ void AgentCore::receivedStatsCallback(const agent_test::FormationStatisticsArray
   }
   neighbours_ = received.neighbours_;  // updates current neighbourhood
   for (auto const &data : received.vector) {
-    int id = std::stoi(data.header.frame_id.substr(frame_base_name_.size()));
-    if (std::find(std::begin(neighbours_), std::end(neighbours_), id) != std::end(neighbours_)) {
+    if (std::find(std::begin(neighbours_), std::end(neighbours_), data.agent_id) != std::end(neighbours_)) {
       received_statistics_.push_back(data.stats);
     }
   }

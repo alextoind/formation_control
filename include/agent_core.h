@@ -66,7 +66,9 @@
 #define DEFAULT_FIXED_FRAME "map"
 #define DEFAULT_FRAME_BASE_NAME "agent_"
 
+// TODO extend the algorithm to work in 3D even if our approximation is in 2D
 // TODO add a debug verbosity level and improve debug messages
+// TODO add an interactive marker
 
 
 class AgentCore {

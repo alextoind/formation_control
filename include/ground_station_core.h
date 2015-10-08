@@ -30,6 +30,8 @@
 #include <geometry_msgs/Pose.h>
 #include <Eigen/Dense>
 #include <eigen_conversions/eigen_msg.h>
+#include <tf/transform_broadcaster.h>
+#include <visualization_msgs/Marker.h>
 // Auto-generated from msg/ directory libraries
 #include "agent_test/FormationStatistics.h"
 #include "agent_test/FormationStatisticsStamped.h"
@@ -44,6 +46,7 @@
 #define DEFAULT_RECEIVED_STATS_TOPIC "received_stats"
 #define DEFAULT_TARGET_STATS_TOPIC "target_stats"
 #define DEFAULT_SYNC_SERVICE "sync_agent"
+#define DEFAULT_MARKER_TOPIC "visualization_marker"
 #define DEFAULT_GROUND_STATION_FRAME "ground_station"
 #define DEFAULT_NUMBER_OF_AGENTS 1
 #define DEFAULT_SYNC_DELAY 5.0  // expressed in seconds
@@ -59,9 +62,11 @@ class GroundStationCore {
   ros::NodeHandle *private_node_handle_;
   ros::Publisher target_stats_publisher_;
   ros::Publisher stats_publisher_;
+  ros::Publisher marker_publisher_;
   ros::Subscriber stats_subscriber_;
   ros::Timer algorithm_timer_;
   ros::ServiceServer sync_server_;
+  tf::TransformBroadcaster tf_broadcaster_;
   ros::Time sync_time_;
   ros::Duration sync_delay_;
   double sample_time_;
@@ -72,7 +77,9 @@ class GroundStationCore {
   std::string received_stats_topic_name_;
   std::string target_stats_topic_name_;
   std::string sync_service_name_;
+  std::string marker_topic_name_;
   std::string ground_station_frame_;
+  std::string fixed_frame_;
 
   agent_test::FormationStatistics target_statistics_;
   std::vector<agent_test::FormationStatisticsStamped> shared_statistics_grouped_;
@@ -89,7 +96,12 @@ class GroundStationCore {
   int extractFirstID();
 
   agent_test::FormationStatistics statsVectorToMsg(const std::vector<double> &vector);
-  agent_test::FormationStatisticsStamped statsVectorToMsg(const std::string &frame, const std::vector <double> &vector);
+  agent_test::FormationStatisticsStamped statsVectorToMsg(const std::string &frame, const int &id,
+                                                          const std::vector <double> &vector);
+
+  void updateSpanningEllipse(const agent_test::FormationStatisticsStamped &msg);
+  visualization_msgs::Marker buildMarker(const double &diameter_x, const double &diameter_y, const std::string &frame,
+                                         const int &id);
 };
 
 #endif
