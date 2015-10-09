@@ -33,12 +33,14 @@
 #include <nav_msgs/Path.h>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_datatypes.h>
+#include <visualization_msgs/Marker.h>
 // Auto-generated from msg/ directory libraries
 #include "agent_test/FormationStatistics.h"
 #include "agent_test/FormationStatisticsStamped.h"
 #include "agent_test/FormationStatisticsArray.h"
 #include <agent_test/Sync.h>
 // default values for ROS params (if not specified by the user)
+#define DEFAULT_VERBOSITY_LEVEL 0
 #define DEFAULT_NUMBER_OF_STATS 5  // see FormationStatistics.msg (mx, my, mxx, mxy, myy)
 #define DEFAULT_NUMBER_OF_VELOCITIES 2  // virtual planar linear twist (virtual_x_dot, virutal_y_dot)
 #define DEFAULT_AGENT_ID 0  // if not setted by the user, the Ground Station will choose an unique value
@@ -58,11 +60,10 @@
 #define DEFAULT_SHARED_STATS_TOPIC "shared_stats"
 #define DEFAULT_RECEIVED_STATS_TOPIC "received_stats"
 #define DEFAULT_TARGET_STATS_TOPIC "target_stats"
+#define DEFAULT_MARKER_TOPIC "visualization_marker"
 #define DEFAULT_SYNC_SERVICE "sync_agent"
 #define DEFAULT_SYNC_TIMEOUT 10.0  // expressed in seconds
-#define DEFAULT_PATH_TOPIC "agent_paths"
-#define DEFAULT_PATH_VIRTUAL_TOPIC "virtual_agent_paths"
-#define DEFAULT_PATH_MAX_LENGTH 100  // maximum number of poses to be stored in the path
+#define DEFAULT_MARKER_PATH_LIFETIME 30  // expressed in seconds
 #define DEFAULT_FIXED_FRAME "map"
 #define DEFAULT_FRAME_BASE_NAME "agent_"
 
@@ -80,20 +81,15 @@ class AgentCore {
   ros::NodeHandle node_handle_;
   ros::NodeHandle *private_node_handle_;
   ros::Publisher stats_publisher_;
+  ros::Publisher marker_publisher_;
   ros::Subscriber stats_subscriber_;
   ros::Subscriber target_stats_subscriber_;
   ros::Timer algorithm_timer_;
   ros::ServiceClient sync_client_;
   tf::TransformBroadcaster tf_broadcaster_;
 
-  ros::Publisher path_publisher_;
-  ros::Publisher path_virtual_publisher_;
-  std::string path_topic_name_;
-  std::string path_virtual_topic_name_;
-
-  std::vector<geometry_msgs::PoseStamped> path_;
-  std::vector<geometry_msgs::PoseStamped> path_virtual_;
-  int path_max_length_;
+  int marker_path_id_;
+  int marker_path_lifetime_;
   std::string fixed_frame_;
   std::string frame_base_name_;
   std::string agent_frame_;
@@ -104,6 +100,7 @@ class AgentCore {
   std::string received_stats_topic_name_;
   std::string target_stats_topic_name_;
   std::string sync_service_name_;
+  std::string marker_topic_name_;
   ros::Duration sync_timeout_;
   double sample_time_;
 
@@ -147,6 +144,8 @@ class AgentCore {
   double vehicle_length_;
   double world_limit_;
 
+  int verbosity_level_;
+
 
   void targetStatsCallback(const agent_test::FormationStatisticsStamped &target);
   void receivedStatsCallback(const agent_test::FormationStatisticsArray &received);
@@ -171,9 +170,9 @@ class AgentCore {
 
   void waitForSyncTime();
 
-  void broadcastPath(const geometry_msgs::Pose &pose, std::vector<geometry_msgs::PoseStamped> &path,
-                     const ros::Publisher &publisher);
+  void broadcastPath(const geometry_msgs::Pose &pose_new, const geometry_msgs::Pose &pose_old, const std::string &frame);
   void broadcastPose(const geometry_msgs::Pose &pose, const std::string &frame);
+  visualization_msgs::Marker buildMarker(const geometry_msgs::Point &p0, const geometry_msgs::Point &p1, const std::string &frame);
 };
 
 #endif

@@ -73,41 +73,6 @@ void GroundStationCore::algorithmCallback(const ros::TimerEvent &timer_event) {
   shared_statistics_grouped_.clear();
 }
 
-bool GroundStationCore::checkCollision(const int &id) {
-  return std::find(std::begin(connected_agents_), std::end(connected_agents_), id) != std::end(connected_agents_);
-}
-
-int GroundStationCore::extractFirstID() {
-  for (int i=1; i<=number_of_agents_; i++){
-    if (!checkCollision(i)) {
-      return i;
-    }
-  }
-  ROS_ERROR_STREAM("[GroundStationCore::extractFirstID] Can't find a valid ID: check the current number of agents ("
-                   << number_of_agents_ << ").");
-  return -1;
-}
-
-void GroundStationCore::updateSpanningEllipse(const agent_test::FormationStatisticsStamped &msg) {
-  std::string frame = msg.header.frame_id + "_ellipse";
-  double m_xy = 2*(msg.stats.m_xy - msg.stats.m_x*msg.stats.m_y);
-  double m_xx = msg.stats.m_xx - std::pow(msg.stats.m_x, 2);
-  double m_yy = msg.stats.m_yy - std::pow(msg.stats.m_y, 2);
-
-  double theta = std::atan2(m_xy, m_xx - m_yy)/2;
-  double a_x = m_xx*std::pow(std::cos(theta), 2) + m_yy*std::pow(std::sin(theta), 2) + m_xy*std::sin(theta)*std::cos(theta);
-  double a_y = m_yy*std::pow(std::cos(theta), 2) + m_xx*std::pow(std::sin(theta), 2) - m_xy*std::sin(theta)*std::cos(theta);
-
-  tf::Pose pose;
-  pose.setOrigin(tf::Vector3(msg.stats.m_x, msg.stats.m_y, 0));
-  pose.setRotation(tf::createQuaternionFromRPY(0, 0, theta));
-  tf_broadcaster_.sendTransform(tf::StampedTransform(pose, ros::Time::now(), fixed_frame_, frame));
-
-  double diameter_x = 2*std::sqrt(number_of_agents_*std::abs(a_x));
-  double diameter_y = 2*std::sqrt(number_of_agents_*std::abs(a_y));
-  marker_publisher_.publish(buildMarker(diameter_x, diameter_y, frame, msg.agent_id));
-}
-
 visualization_msgs::Marker GroundStationCore::buildMarker(const double &diameter_x, const double &diameter_y,
                                                           const std::string &frame, const int &id) {
   visualization_msgs::Marker marker;
@@ -136,6 +101,21 @@ visualization_msgs::Marker GroundStationCore::buildMarker(const double &diameter
   marker.scale.z = 0.001;
 
   return marker;
+}
+
+bool GroundStationCore::checkCollision(const int &id) {
+  return std::find(std::begin(connected_agents_), std::end(connected_agents_), id) != std::end(connected_agents_);
+}
+
+int GroundStationCore::extractFirstID() {
+  for (int i=1; i<=number_of_agents_; i++){
+    if (!checkCollision(i)) {
+      return i;
+    }
+  }
+  ROS_ERROR_STREAM("[GroundStationCore::extractFirstID] Can't find a valid ID: check the current number of agents ("
+                   << number_of_agents_ << ").");
+  return -1;
 }
 
 void GroundStationCore::sharedStatsCallback(const agent_test::FormationStatisticsStamped &shared) {
@@ -181,6 +161,26 @@ bool GroundStationCore::syncAgentCallback(agent_test::Sync::Request &request, ag
   shared_statistics_grouped_.push_back(statsVectorToMsg(request.frame_base_name + std::to_string(response.new_id),
                                                         response.new_id, std::vector<double>({0,0,0,0,0})));
   return true;
+}
+
+void GroundStationCore::updateSpanningEllipse(const agent_test::FormationStatisticsStamped &msg) {
+  std::string frame = msg.header.frame_id + "_ellipse";
+  double m_xy = 2*(msg.stats.m_xy - msg.stats.m_x*msg.stats.m_y);
+  double m_xx = msg.stats.m_xx - std::pow(msg.stats.m_x, 2);
+  double m_yy = msg.stats.m_yy - std::pow(msg.stats.m_y, 2);
+
+  double theta = std::atan2(m_xy, m_xx - m_yy)/2;
+  double a_x = m_xx*std::pow(std::cos(theta), 2) + m_yy*std::pow(std::sin(theta), 2) + m_xy*std::sin(theta)*std::cos(theta);
+  double a_y = m_yy*std::pow(std::cos(theta), 2) + m_xx*std::pow(std::sin(theta), 2) - m_xy*std::sin(theta)*std::cos(theta);
+
+  tf::Pose pose;
+  pose.setOrigin(tf::Vector3(msg.stats.m_x, msg.stats.m_y, 0));
+  pose.setRotation(tf::createQuaternionFromRPY(0, 0, theta));
+  tf_broadcaster_.sendTransform(tf::StampedTransform(pose, ros::Time::now(), fixed_frame_, frame));
+
+  double diameter_x = 2*std::sqrt(number_of_agents_*std::abs(a_x));
+  double diameter_y = 2*std::sqrt(number_of_agents_*std::abs(a_y));
+  marker_publisher_.publish(buildMarker(diameter_x, diameter_y, frame, msg.agent_id));
 }
 
 void GroundStationCore::waitForSync() {

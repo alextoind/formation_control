@@ -11,17 +11,19 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <ground_station_core.h>
 #include "agent_core.h"
 
 AgentCore::AgentCore() {
   // handles server private parameters (private names are protected from accidental name collisions)
   private_node_handle_ = new ros::NodeHandle("~");
 
+  private_node_handle_->param("verbosity_level", verbosity_level_, DEFAULT_VERBOSITY_LEVEL);
   private_node_handle_->param("agent_id", agent_id_, DEFAULT_AGENT_ID);
   private_node_handle_->param("number_of_stats", number_of_stats_, DEFAULT_NUMBER_OF_STATS);
   private_node_handle_->param("number_of_velocities", number_of_velocities_, DEFAULT_NUMBER_OF_VELOCITIES);
   private_node_handle_->param("sample_time", sample_time_, (double)DEFAULT_SAMPLE_TIME);
-  private_node_handle_->param("velocity_virtual_threshold_", velocity_virtual_threshold_, (double)DEFAULT_VELOCITY_VIRTUAL_THRESHOLD);
+  private_node_handle_->param("velocity_virtual_threshold", velocity_virtual_threshold_, (double)DEFAULT_VELOCITY_VIRTUAL_THRESHOLD);
   private_node_handle_->param("los_distance_threshold", los_distance_threshold_, (double)DEFAULT_LOS_DISTANCE_THRESHOLD);
   private_node_handle_->param("speed_min", speed_min_, (double)DEFAULT_SPEED_MIN);
   private_node_handle_->param("speed_max", speed_max_, (double)DEFAULT_SPEED_MAX);
@@ -33,9 +35,9 @@ AgentCore::AgentCore() {
   private_node_handle_->param("vehicle_length", vehicle_length_, (double)DEFAULT_VEHICLE_LENGTH);
   private_node_handle_->param("world_limit", world_limit_, (double)DEFAULT_WORLD_LIMIT);
 
-  const std::vector<double> DEFAULT_DIAG_ELEMENTS_GAMMA = {500, 500, 5, 5, 5};
-  const std::vector<double> DEFAULT_DIAG_ELEMENTS_LAMBDA = {0, 0, 0, 0, 0};
-  const std::vector<double> DEFAULT_DIAG_ELEMENTS_B = {500, 500};
+  const std::vector<double> DEFAULT_DIAG_ELEMENTS_GAMMA = {100, 100, 10, 10, 10};
+  const std::vector<double> DEFAULT_DIAG_ELEMENTS_LAMBDA = {4, 4, 4, 4, 4};
+  const std::vector<double> DEFAULT_DIAG_ELEMENTS_B = {100, 100};
   std::vector<double> diag_elements_gamma;
   std::vector<double> diag_elements_lambda;
   std::vector<double> diag_elements_b;
@@ -71,22 +73,19 @@ AgentCore::AgentCore() {
   private_node_handle_->param("received_stats_topic", received_stats_topic_name_, std::string(DEFAULT_RECEIVED_STATS_TOPIC));
   private_node_handle_->param("target_stats_topic", target_stats_topic_name_, std::string(DEFAULT_TARGET_STATS_TOPIC));
   private_node_handle_->param("sync_service", sync_service_name_, std::string(DEFAULT_SYNC_SERVICE));
-  private_node_handle_->param("path_topic", path_topic_name_, std::string(DEFAULT_PATH_TOPIC));
-  private_node_handle_->param("path_virtual_topic", path_virtual_topic_name_, std::string(DEFAULT_PATH_VIRTUAL_TOPIC));
-  private_node_handle_->param("path_max_length", path_max_length_, DEFAULT_PATH_MAX_LENGTH);
+  private_node_handle_->param("marker_topic", marker_topic_name_, std::string(DEFAULT_MARKER_TOPIC));
+  private_node_handle_->param("marker_path_lifetime", marker_path_lifetime_, DEFAULT_MARKER_PATH_LIFETIME);
   private_node_handle_->param("fixed_frame", fixed_frame_, std::string(DEFAULT_FIXED_FRAME));
   private_node_handle_->param("frame_base_name", frame_base_name_, std::string(DEFAULT_FRAME_BASE_NAME));
   double sync_timeout;
   private_node_handle_->param("sync_timeout", sync_timeout, (double)DEFAULT_SYNC_TIMEOUT);
   sync_timeout_ = ros::Duration(sync_timeout);
 
+  marker_publisher_ = node_handle_.advertise<visualization_msgs::Marker>(marker_topic_name_, topic_queue_length_);
   stats_publisher_ = node_handle_.advertise<agent_test::FormationStatisticsStamped>(shared_stats_topic_name_, topic_queue_length_);
   stats_subscriber_ = node_handle_.subscribe(received_stats_topic_name_, topic_queue_length_, &AgentCore::receivedStatsCallback, this);
   target_stats_subscriber_ = node_handle_.subscribe(target_stats_topic_name_, topic_queue_length_, &AgentCore::targetStatsCallback, this);
   sync_client_ = node_handle_.serviceClient<agent_test::Sync>(sync_service_name_);
-
-  path_publisher_ = node_handle_.advertise<nav_msgs::Path>(path_topic_name_, topic_queue_length_);
-  path_virtual_publisher_ = node_handle_.advertise<nav_msgs::Path>(path_virtual_topic_name_, topic_queue_length_);
 
   waitForSyncTime();
 
@@ -104,29 +103,36 @@ void AgentCore::algorithmCallback(const ros::TimerEvent &timer_event) {
   dynamics();  // also publishes agent pose and path
 }
 
-void AgentCore::broadcastPath(const geometry_msgs::Pose &pose, std::vector<geometry_msgs::PoseStamped> &path,
-                              const ros::Publisher &publisher) {
-  geometry_msgs::PoseStamped pose_msg;
-  pose_msg.header.frame_id = fixed_frame_;
-  pose_msg.header.stamp = ros::Time::now();
-  pose_msg.pose = pose;
-
-  path.push_back(pose_msg);
-  if (path.size() > path_max_length_) {
-    path.erase(path.begin());
-  }
-
-  nav_msgs::Path msg;
-  msg.header.frame_id = fixed_frame_;
-  msg.header.stamp = ros::Time::now();
-  msg.poses = path;
-  publisher.publish(msg);
+void AgentCore::broadcastPath(const geometry_msgs::Pose &pose_new, const geometry_msgs::Pose &pose_old, const std::string &frame) {
+  marker_publisher_.publish(buildMarker(pose_old.position, pose_new.position, frame));
 }
 
 void AgentCore::broadcastPose(const geometry_msgs::Pose &pose, const std::string &frame) {
   tf::Pose p;
   tf::poseMsgToTF(pose, p);
   tf_broadcaster_.sendTransform(tf::StampedTransform(p, ros::Time::now(), fixed_frame_, frame));
+}
+
+visualization_msgs::Marker AgentCore::buildMarker(const geometry_msgs::Point &p0, const geometry_msgs::Point &p1, const std::string &frame) {
+  visualization_msgs::Marker marker;
+  marker.header.frame_id = fixed_frame_;
+  marker.header.stamp = ros::Time(0);
+  marker.type = visualization_msgs::Marker::LINE_STRIP;
+  marker.action = visualization_msgs::Marker::ADD;
+  marker.ns = frame + "_path";
+  marker.id = marker_path_id_++;
+  marker.frame_locked = true;
+  marker.lifetime = ros::Duration(marker_path_lifetime_);
+  marker.color.a = 0.5;
+  marker.color.r = 0.5;
+  marker.color.g = 0.5;
+  marker.color.b = 0.5;
+  marker.points.push_back(p0);
+  marker.points.push_back(p1);
+  // relative pose is zero: the frame is already properly centered and rotated
+  marker.scale.x = 0.1;
+
+  return marker;
 }
 
 void AgentCore::consensus() {
@@ -155,7 +161,7 @@ void AgentCore::consensus() {
   stats_publisher_.publish(msg);
 }
 
-void AgentCore::control() {  // TODO fix
+void AgentCore::control() {
   Eigen::VectorXd stats_error = statsMsgToVector(target_statistics_) - statsMsgToVector(estimated_statistics_);
   // update non constant values of the jacobian of phi(p) = [px, py, pxx, pxy, pyy]
   jacob_phi_(2,0) = 2*pose_virtual_.position.x;
@@ -173,19 +179,22 @@ void AgentCore::control() {  // TODO fix
     control_law *= velocity_virtual_threshold_ / current_velocity_virtual;
   }
 
+  geometry_msgs::Pose pose_old = pose_virtual_;
   pose_virtual_.position.x = integrator(pose_virtual_.position.x, twist_virtual_.linear.x, control_law(0), 1);
   pose_virtual_.position.y = integrator(pose_virtual_.position.y, twist_virtual_.linear.y, control_law(1), 1);
   setTheta(pose_virtual_.orientation, std::atan2(control_law(1), control_law(0)));
   twist_virtual_.linear.x = control_law(0);
   twist_virtual_.linear.y = control_law(1);
 
+  ROS_DEBUG_STREAM("[AgentCore::control] Agent " << agent_id_ << " stats error: " << (Eigen::RowVectorXd)stats_error);
+  ROS_DEBUG_STREAM("[AgentCore::control] Agent " << agent_id_ << " control law: " << (Eigen::RowVectorXd)control_law);
   ROS_DEBUG_STREAM("[AgentCore::control] Virtual agent pose (x: " << pose_virtual_.position.x
                    << ", y: " << pose_virtual_.position.y << ")");
   ROS_DEBUG_STREAM("[AgentCore::control] Virtual agent twist (x: " << twist_virtual_.linear.x
                    << ", y: " << twist_virtual_.linear.y << ")");
 
   broadcastPose(pose_virtual_, agent_virtual_frame_);
-  broadcastPath(pose_virtual_, path_virtual_, path_virtual_publisher_);  // TODO use Marker instead of Path
+  broadcastPath(pose_virtual_, pose_old, agent_virtual_frame_);
 }
 
 void AgentCore::dynamics() {
@@ -194,6 +203,7 @@ void AgentCore::dynamics() {
   double y_dot_new = twist_.linear.y = speed_command_sat_ * std::sin(theta);
   double theta_dot_new = speed_command_sat_ / vehicle_length_ * std::tan(steer_command_sat_);
 
+  geometry_msgs::Pose pose_old = pose_;
   pose_.position.x = integrator(pose_.position.x, twist_.linear.x, x_dot_new, 1);
   pose_.position.y = integrator(pose_.position.y, twist_.linear.y, y_dot_new, 1);
   setTheta(pose_.orientation, integrator(theta, twist_.angular.z, theta_dot_new, 1));
@@ -205,7 +215,7 @@ void AgentCore::dynamics() {
   ROS_DEBUG_STREAM("[AgentCore::dynamics] Agent twist (x: " << twist_.linear.x << ", y: " << twist_.linear.y << ")");
 
   broadcastPose(pose_, agent_frame_);
-  broadcastPath(pose_, path_, path_publisher_);  // TODO use Marker instead of Path
+  broadcastPath(pose_, pose_old, agent_frame_);
 }
 
 Eigen::Vector3d AgentCore::getRPY(const geometry_msgs::Quaternion &quat) {
@@ -220,7 +230,7 @@ double AgentCore::getTheta(const geometry_msgs::Quaternion &quat) {
   return rpy(2);
 }
 
-void AgentCore::guidance() {  // TODO fix
+void AgentCore::guidance() {
   los_distance_ = std::sqrt(std::pow(pose_virtual_.position.x - pose_.position.x, 2)
                             + std::pow(pose_virtual_.position.y - pose_.position.y, 2));
   // std::atan2 automatically handle the los_distance_ == 0 case >> los_angle_ = 0 TODO: try with velocty instead of position
@@ -233,10 +243,11 @@ void AgentCore::guidance() {  // TODO fix
   speed_integral_ = integrator(speed_integral_, speed_error_old, speed_error_, k_i_speed_);
   double speed_command = k_p_speed_*(speed_error_ + speed_integral_);
   speed_command_sat_ = saturation(speed_command, speed_min_, speed_max_);
-  ROS_DEBUG_STREAM("[AgentCore::guidance] Speed command: " << speed_command_sat_);
 
   double steer_command = k_p_steer_*std::fmod(los_angle_ - getTheta(pose_.orientation), M_PI);
   steer_command_sat_ = saturation(steer_command, steer_min_, steer_max_);
+
+  ROS_DEBUG_STREAM("[AgentCore::guidance] Speed command: " << speed_command_sat_);
   ROS_DEBUG_STREAM("[AgentCore::guidance] Steer command: " << steer_command_sat_);
 }
 
