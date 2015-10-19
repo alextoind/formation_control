@@ -28,10 +28,14 @@
 #include <ros/time.h>
 #include <geometry_msgs/Twist.h>
 #include <geometry_msgs/Pose.h>
+#include <angles/angles.h>
 #include <Eigen/Dense>
 #include <eigen_conversions/eigen_msg.h>
+#include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
+#include <tf/transform_datatypes.h>
 #include <visualization_msgs/Marker.h>
+#include <interactive_markers/interactive_marker_server.h>
 // Auto-generated from msg/ directory libraries
 #include "agent_test/FormationStatistics.h"
 #include "agent_test/FormationStatisticsStamped.h"
@@ -48,8 +52,13 @@
 #define DEFAULT_SYNC_SERVICE "sync_agent"
 #define DEFAULT_MARKER_TOPIC "visualization_marker"
 #define DEFAULT_GROUND_STATION_FRAME "ground_station"
+#define DEFAULT_FIXED_FRAME "map"
+#define DEFAULT_TARGET_FRAME "target_stats_ellipse"
 #define DEFAULT_NUMBER_OF_AGENTS 1
 #define DEFAULT_SYNC_DELAY 5.0  // expressed in seconds
+
+// TODO: add critical failure handler
+// TODO: implement a sort of inertia for the interactive markers (actually they are moving too fast, but it is not critical)
 
 
 class GroundStationCore {
@@ -66,11 +75,18 @@ class GroundStationCore {
   ros::Subscriber stats_subscriber_;
   ros::Timer algorithm_timer_;
   ros::ServiceServer sync_server_;
+  tf::TransformListener tf_listener_;
   tf::TransformBroadcaster tf_broadcaster_;
+  interactive_markers::InteractiveMarkerServer *interactive_marker_server_;
+
   ros::Time sync_time_;
   ros::Duration sync_delay_;
   double sample_time_;
   int number_of_agents_;
+
+  geometry_msgs::Pose target_pose_;
+  double target_a_x_;
+  double target_a_y_;
 
   int topic_queue_length_;
   std::string shared_stats_topic_name_;
@@ -80,10 +96,11 @@ class GroundStationCore {
   std::string marker_topic_name_;
   std::string ground_station_frame_;
   std::string fixed_frame_;
+  std::string target_frame_;
 
-  agent_test::FormationStatistics target_statistics_;
+  agent_test::FormationStatisticsStamped target_statistics_;
   std::vector<agent_test::FormationStatisticsStamped> shared_statistics_grouped_;
-  std::vector<int> connected_agents_;  // TODO add critical failure handler
+  std::vector<int> connected_agents_;
 
 
   void algorithmCallback(const ros::TimerEvent &timer_event);
@@ -99,9 +116,26 @@ class GroundStationCore {
   agent_test::FormationStatisticsStamped statsVectorToMsg(const std::string &frame, const int &id,
                                                           const std::vector <double> &vector);
 
+  tf::Pose statsToPhysics(const agent_test::FormationStatistics &stats, double &a_x, double &a_y);
+  tf::Pose statsToPhysics(const agent_test::FormationStatistics &stats, double &a_x, double &a_y, const double &theta_old);
+  agent_test::FormationStatistics physicsToStats(const geometry_msgs::Pose &pose, const double &a_x, const double &a_y);
+  void thetaCorrection(double &theta, const double &theta_old);
+
+  double diameter(const double &a);
   void updateSpanningEllipse(const agent_test::FormationStatisticsStamped &msg);
-  visualization_msgs::Marker buildMarker(const double &diameter_x, const double &diameter_y, const std::string &frame,
+  visualization_msgs::Marker makeEllipse(const double &diameter_x, const double &diameter_y, const std::string &frame,
                                          const int &id);
+
+  void interactiveMarkerInitialization();
+  void interactiveMarkerCallback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback);
+
+  visualization_msgs::Marker makeBox(const double &scale);
+  void makeBoxControl(visualization_msgs::InteractiveMarker &interactive_marker);
+  void makeInteractiveMarkerAxis(const geometry_msgs::Pose &pose, const std::string &axis);
+  void makeInteractiveMarkerPose(const geometry_msgs::Pose &pose);
+
+  void updateTarget(const agent_test::FormationStatistics &target);
+  void updateTargetStats(const agent_test::FormationStatistics &target);
 };
 
 #endif

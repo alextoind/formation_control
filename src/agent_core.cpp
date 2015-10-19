@@ -244,7 +244,7 @@ void AgentCore::guidance() {
   double speed_command = k_p_speed_*(speed_error_ + speed_integral_);
   speed_command_sat_ = saturation(speed_command, speed_min_, speed_max_);
 
-  double steer_command = k_p_steer_*std::fmod(los_angle_ - getTheta(pose_.orientation), M_PI);
+  double steer_command = k_p_steer_*angles::normalize_angle(los_angle_ - getTheta(pose_.orientation));
   steer_command_sat_ = saturation(steer_command, steer_min_, steer_max_);
 
   ROS_DEBUG_STREAM("[AgentCore::guidance] Speed command: " << speed_command_sat_);

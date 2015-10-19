@@ -28,6 +28,7 @@
 #include <ros/time.h>
 #include <geometry_msgs/Twist.h>
 #include <geometry_msgs/Pose.h>
+#include <angles/angles.h>
 #include <Eigen/Dense>
 #include <eigen_conversions/eigen_msg.h>
 #include <nav_msgs/Path.h>
@@ -67,9 +68,9 @@
 #define DEFAULT_FIXED_FRAME "map"
 #define DEFAULT_FRAME_BASE_NAME "agent_"
 
-// TODO extend the algorithm to work in 3D even if our approximation is in 2D
-// TODO add a debug verbosity level and improve debug messages
-// TODO add an interactive marker
+// TODO: extend the algorithm to work in 3D even if our approximation is in 2D
+// TODO: add a debug verbosity level and improve debug messages
+// TODO: choose properly which variables has to be ROS params (for both classes)
 
 
 class AgentCore {

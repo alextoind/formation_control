@@ -7,9 +7,11 @@ find_package(catkin REQUIRED COMPONENTS
   cmake_modules
   std_msgs
   geometry_msgs
+  visualization_msgs
   eigen_conversions
   message_generation
   tf
+  interactive_markers
 )
 find_package(Eigen REQUIRED)
 
@@ -43,7 +45,10 @@ catkin_package(
     roscpp
     std_msgs
     geometry_msgs
+    visualization_msgs
     message_runtime
+    tf
+    interactive_markers
   DEPENDS
     Eigen
 )
