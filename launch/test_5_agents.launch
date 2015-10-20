@@ -3,7 +3,7 @@
 
   <node pkg="tf" type="static_transform_publisher" name="fixed_frame_pub" args="0.0 0.0 0.0 0.0 0.0 0.0 map map_origin 100" />
 
-  <arg name="number_of_agents" default="3"/>
+  <arg name="number_of_agents" default="5"/>
   <node pkg="agent_test" type="ground_station_test" name="ground_station" output="screen" cwd="ROS_HOME">
     <param name="number_of_agents" type="int" value="$(arg number_of_agents)" />
     <rosparam command="load" file="$(find agent_test)/config/ground_station_initialization.yaml" />

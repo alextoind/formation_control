@@ -46,17 +46,17 @@
 #define DEFAULT_NUMBER_OF_VELOCITIES 2  // virtual planar linear twist (virtual_x_dot, virutal_y_dot)
 #define DEFAULT_AGENT_ID 0  // if not setted by the user, the Ground Station will choose an unique value
 #define DEFAULT_SAMPLE_TIME 0.25  // expressed in seconds
-#define DEFAULT_VELOCITY_VIRTUAL_THRESHOLD 4.0  // expressed in meters/second
+#define DEFAULT_VELOCITY_VIRTUAL_THRESHOLD 10.0  // expressed in meters/second
 #define DEFAULT_LOS_DISTANCE_THRESHOLD 4.0
 #define DEFAULT_SPEED_MIN 0.0  // expressed in meters/second
 #define DEFAULT_SPEED_MAX 4.0  // expressed in meters/second
 #define DEFAULT_STEER_MIN -0.52  // expressed in radiants
 #define DEFAULT_STEER_MAX 0.52  // expressed in radiants
-#define DEFAULT_K_P_SPEED 15.0
+#define DEFAULT_K_P_SPEED 1.0
 #define DEFAULT_K_I_SPEED 0.05
 #define DEFAULT_K_P_STEER 0.5
 #define DEFAULT_VEHICLE_LENGTH 0.4  // expressed in meters
-#define DEFAULT_WORLD_LIMIT 5.0  // in meters, considering a "square world"
+#define DEFAULT_WORLD_LIMIT 5.0  // in meters, considering a "square world" (only for random pose generation)
 #define DEFAULT_TOPIC_QUEUE_LENGTH 1
 #define DEFAULT_SHARED_STATS_TOPIC "shared_stats"
 #define DEFAULT_RECEIVED_STATS_TOPIC "received_stats"
@@ -67,6 +67,7 @@
 #define DEFAULT_MARKER_PATH_LIFETIME 30  // expressed in seconds
 #define DEFAULT_FIXED_FRAME "map"
 #define DEFAULT_FRAME_BASE_NAME "agent_"
+#define DEFAULT_FRAME_VIRTUAL_SUFFIX "_virtual"
 
 // TODO: extend the algorithm to work in 3D even if our approximation is in 2D
 // TODO: add a debug verbosity level and improve debug messages
@@ -93,6 +94,7 @@ class AgentCore {
   int marker_path_lifetime_;
   std::string fixed_frame_;
   std::string frame_base_name_;
+  std::string frame_virtual_suffix_;
   std::string agent_frame_;
   std::string agent_virtual_frame_;
 
@@ -132,8 +134,6 @@ class AgentCore {
   double steer_min_;
   double steer_max_;
 
-  double los_distance_;
-  double los_angle_;
   double speed_error_;
   double speed_integral_;
   double speed_command_sat_;

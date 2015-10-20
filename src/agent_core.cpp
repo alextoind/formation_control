@@ -35,9 +35,9 @@ AgentCore::AgentCore() {
   private_node_handle_->param("vehicle_length", vehicle_length_, (double)DEFAULT_VEHICLE_LENGTH);
   private_node_handle_->param("world_limit", world_limit_, (double)DEFAULT_WORLD_LIMIT);
 
-  const std::vector<double> DEFAULT_DIAG_ELEMENTS_GAMMA = {100, 100, 10, 10, 10};
-  const std::vector<double> DEFAULT_DIAG_ELEMENTS_LAMBDA = {4, 4, 4, 4, 4};
-  const std::vector<double> DEFAULT_DIAG_ELEMENTS_B = {100, 100};
+  const std::vector<double> DEFAULT_DIAG_ELEMENTS_GAMMA = {500, 500, 25, 25, 25};
+  const std::vector<double> DEFAULT_DIAG_ELEMENTS_LAMBDA = {10, 10, 10, 10, 10};
+  const std::vector<double> DEFAULT_DIAG_ELEMENTS_B = {50, 50};
   std::vector<double> diag_elements_gamma;
   std::vector<double> diag_elements_lambda;
   std::vector<double> diag_elements_b;
@@ -77,6 +77,7 @@ AgentCore::AgentCore() {
   private_node_handle_->param("marker_path_lifetime", marker_path_lifetime_, DEFAULT_MARKER_PATH_LIFETIME);
   private_node_handle_->param("fixed_frame", fixed_frame_, std::string(DEFAULT_FIXED_FRAME));
   private_node_handle_->param("frame_base_name", frame_base_name_, std::string(DEFAULT_FRAME_BASE_NAME));
+  private_node_handle_->param("frame_virtual_suffix", frame_virtual_suffix_, std::string(DEFAULT_FRAME_VIRTUAL_SUFFIX));
   double sync_timeout;
   private_node_handle_->param("sync_timeout", sync_timeout, (double)DEFAULT_SYNC_TIMEOUT);
   sync_timeout_ = ros::Duration(sync_timeout);
@@ -123,10 +124,18 @@ visualization_msgs::Marker AgentCore::buildMarker(const geometry_msgs::Point &p0
   marker.id = marker_path_id_++;
   marker.frame_locked = true;
   marker.lifetime = ros::Duration(marker_path_lifetime_);
-  marker.color.a = 0.5;
-  marker.color.r = 0.5;
-  marker.color.g = 0.5;
-  marker.color.b = 0.5;
+  if (frame.find(frame_virtual_suffix_) != std::string::npos) {
+    marker.color.a = 0.5;
+    marker.color.r = 1.0;
+    marker.color.g = 0.5;
+    marker.color.b = 0.0;
+  }
+  else {
+    marker.color.a = 0.5;
+    marker.color.r = 0.0;
+    marker.color.g = 0.5;
+    marker.color.b = 1.0;
+  }
   marker.points.push_back(p0);
   marker.points.push_back(p1);
   // relative pose is zero: the frame is already properly centered and rotated
@@ -231,20 +240,20 @@ double AgentCore::getTheta(const geometry_msgs::Quaternion &quat) {
 }
 
 void AgentCore::guidance() {
-  los_distance_ = std::sqrt(std::pow(pose_virtual_.position.x - pose_.position.x, 2)
-                            + std::pow(pose_virtual_.position.y - pose_.position.y, 2));
-  // std::atan2 automatically handle the los_distance_ == 0 case >> los_angle_ = 0 TODO: try with velocty instead of position
-  los_angle_ = std::atan2(pose_virtual_.position.y - pose_.position.y, pose_virtual_.position.x - pose_.position.x);
+  double los_distance = std::sqrt(std::pow(pose_virtual_.position.x - pose_.position.x, 2)
+                                  + std::pow(pose_virtual_.position.y - pose_.position.y, 2));
+  // std::atan2 automatically handle the los_distance == 0 case >> los_angle = 0 TODO: try with velocty instead of position
+  double los_angle = std::atan2(pose_virtual_.position.y - pose_.position.y, pose_virtual_.position.x - pose_.position.x);
 
   // the speed reference is a proportional value based on the LOS distance (with a saturation)
-  double speed_reference = std::min(speed_max_*los_distance_/los_distance_threshold_, speed_max_);
+  double speed_reference = std::min(speed_max_* los_distance /los_distance_threshold_, speed_max_);
   double speed_error_old = speed_error_;
   speed_error_ = speed_reference - std::sqrt(std::pow(twist_.linear.x, 2) + std::pow(twist_.linear.y, 2));
   speed_integral_ = integrator(speed_integral_, speed_error_old, speed_error_, k_i_speed_);
   double speed_command = k_p_speed_*(speed_error_ + speed_integral_);
   speed_command_sat_ = saturation(speed_command, speed_min_, speed_max_);
 
-  double steer_command = k_p_steer_*angles::normalize_angle(los_angle_ - getTheta(pose_.orientation));
+  double steer_command = k_p_steer_*angles::normalize_angle(los_angle - getTheta(pose_.orientation));
   steer_command_sat_ = saturation(steer_command, steer_min_, steer_max_);
 
   ROS_DEBUG_STREAM("[AgentCore::guidance] Speed command: " << speed_command_sat_);
@@ -334,7 +343,7 @@ void AgentCore::waitForSyncTime() {
   if (sync_client_.call(srv)) {
     agent_id_ = srv.response.new_id;  // always update, even if it does not change
     agent_frame_ = frame_base_name_ + std::to_string(agent_id_);
-    agent_virtual_frame_ = agent_frame_ + "_virtual";
+    agent_virtual_frame_ = agent_frame_ + frame_virtual_suffix_;
 
     ROS_DEBUG_STREAM("[AgentCore::waitForSyncTime] Wait for synchronization deadline (" << srv.response.sync_time << ")");
     ros::Time::sleepUntil(srv.response.sync_time);

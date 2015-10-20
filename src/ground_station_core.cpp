@@ -29,6 +29,10 @@ GroundStationCore::GroundStationCore() {
   private_node_handle_->param("fixed_frame", fixed_frame_, std::string(DEFAULT_FIXED_FRAME));
   private_node_handle_->param("target_frame", target_frame_, std::string(DEFAULT_TARGET_FRAME));
   private_node_handle_->param("number_of_agents", number_of_agents_, DEFAULT_NUMBER_OF_AGENTS);
+  private_node_handle_->param("marker_dist_min", marker_dist_min_, (double)DEFAULT_MARKER_DIST_MIN);
+  private_node_handle_->param("marker_dist_max", marker_dist_max_, (double)DEFAULT_MARKER_DIST_MAX);
+  private_node_handle_->param("marker_steer_min", marker_steer_min_, (double)DEFAULT_MARKER_STEER_MIN);
+  private_node_handle_->param("marker_steer_max", marker_steer_max_, (double)DEFAULT_MARKER_STEER_MAX);
   double sync_delay;
   private_node_handle_->param("sync_delay", sync_delay, (double)DEFAULT_SYNC_DELAY);
   sync_delay_ = ros::Duration(sync_delay);
@@ -109,10 +113,35 @@ int GroundStationCore::extractFirstID() {
   return -1;
 }
 
+void GroundStationCore::interactiveMarkerGuidance(const geometry_msgs::Pose &target, geometry_msgs::Pose &current) {
+  tf::Pose current_pose, target_pose;
+  tf::poseMsgToTF(current, current_pose);
+  tf::poseMsgToTF(target, target_pose);
+
+  double distance = tf::tfDistance(current_pose.getOrigin(), target_pose.getOrigin());
+  double distance_sat = saturation(distance, marker_dist_min_, marker_dist_max_);
+  double theta = std::atan2(target.position.y - current.position.y, target.position.x - current.position.x);
+
+  double current_roll, current_pitch, current_yaw, target_roll, target_pitch, target_yaw;
+  tf::Matrix3x3(current_pose.getRotation()).getRPY(current_roll, current_pitch, current_yaw);
+  tf::Matrix3x3(target_pose.getRotation()).getRPY(target_roll, target_pitch, target_yaw);
+  double angle = angles::shortest_angular_distance(current_yaw, target_yaw);
+  double angle_sat = saturation(angle, marker_steer_min_, marker_steer_max_);
+
+  tf::Transform transform;
+  transform.setOrigin(tf::Vector3(distance_sat*std::cos(theta - current_yaw), distance_sat*std::sin(theta - current_yaw), 0));
+  transform.setRotation(tf::createQuaternionFromRPY(0, 0, angle_sat));
+  current_pose *= transform;
+
+  tf::poseTFToMsg(current_pose, current);
+}
+
 void GroundStationCore::interactiveMarkerCallback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback) {
   // updates and shares statistics and updates the relative spanning ellipse
   if (feedback->marker_name == "stats_modifier_pose") {
-    target_pose_ = feedback->pose;
+    // avoids too fast orientation changes in the target ellipse pose
+    interactiveMarkerGuidance(feedback->pose, target_pose_);
+    interactive_marker_server_->setPose(feedback->marker_name, target_pose_, feedback->header);
   }
   else if (feedback->marker_name == "stats_modifier_axis_x") {
     target_a_x_ = std::pow(2*feedback->pose.position.x, 2) / (4*number_of_agents_);  // a = d^2/4n
@@ -171,7 +200,7 @@ visualization_msgs::Marker GroundStationCore::makeEllipse(const double &diameter
   }
   else {
     marker.ns = "agent_spanning_ellipse";
-    marker.color.a = 0.5;
+    marker.color.a = 0.25;
     marker.color.r = 0.0;
     marker.color.g = 0.5;
     marker.color.b = 1.0;
@@ -261,6 +290,10 @@ agent_test::FormationStatistics GroundStationCore::physicsToStats(const geometry
   stats.m_yy = a_x*std::pow(std::sin(yaw), 2) + a_y*std::pow(std::cos(yaw), 2) + std::pow(stats.m_y, 2);
 
   return stats;
+}
+
+double GroundStationCore::saturation(const double &value, const double &min, const double &max) {
+  return std::min(std::max(value, min), max);
 }
 
 void GroundStationCore::sharedStatsCallback(const agent_test::FormationStatisticsStamped &shared) {

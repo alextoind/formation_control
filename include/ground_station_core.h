@@ -55,10 +55,13 @@
 #define DEFAULT_FIXED_FRAME "map"
 #define DEFAULT_TARGET_FRAME "target_stats_ellipse"
 #define DEFAULT_NUMBER_OF_AGENTS 1
+#define DEFAULT_MARKER_DIST_MIN 0
+#define DEFAULT_MARKER_DIST_MAX 0.5
+#define DEFAULT_MARKER_STEER_MIN -0.52
+#define DEFAULT_MARKER_STEER_MAX 0.52
 #define DEFAULT_SYNC_DELAY 5.0  // expressed in seconds
 
 // TODO: add critical failure handler
-// TODO: implement a sort of inertia for the interactive markers (actually they are moving too fast, but it is not critical)
 
 
 class GroundStationCore {
@@ -102,6 +105,11 @@ class GroundStationCore {
   std::vector<agent_test::FormationStatisticsStamped> shared_statistics_grouped_;
   std::vector<int> connected_agents_;
 
+  double marker_dist_min_;
+  double marker_dist_max_;
+  double marker_steer_min_;
+  double marker_steer_max_;
+
 
   void algorithmCallback(const ros::TimerEvent &timer_event);
   void sharedStatsCallback(const agent_test::FormationStatisticsStamped &shared);
@@ -128,6 +136,7 @@ class GroundStationCore {
 
   void interactiveMarkerInitialization();
   void interactiveMarkerCallback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback);
+  void interactiveMarkerGuidance(const geometry_msgs::Pose &target, geometry_msgs::Pose &current);
 
   visualization_msgs::Marker makeBox(const double &scale);
   void makeBoxControl(visualization_msgs::InteractiveMarker &interactive_marker);
@@ -136,6 +145,8 @@ class GroundStationCore {
 
   void updateTarget(const agent_test::FormationStatistics &target);
   void updateTargetStats(const agent_test::FormationStatistics &target);
+
+ double saturation(const double &value, const double &min, const double &max);
 };
 
 #endif

@@ -1,5 +1,5 @@
 <package format="2">
-  <name>agent_test</name>
+  <name>agent_test</name>  <!--TODO: change package name-->
   <version>0.0.1</version>
   <description>
     Agent Test
