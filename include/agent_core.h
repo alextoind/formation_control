@@ -100,6 +100,7 @@ class AgentCore {
   ros::ServiceClient sync_client_;
   tf::TransformBroadcaster tf_broadcaster_;
 
+  bool enable_path_;
   int marker_path_id_;
   int marker_path_lifetime_;
   std::string fixed_frame_;
@@ -184,7 +185,8 @@ class AgentCore {
 
   void broadcastPath(const geometry_msgs::Pose &pose_new, const geometry_msgs::Pose &pose_old, const std::string &frame);
   void broadcastPose(const geometry_msgs::Pose &pose, const std::string &frame);
-  visualization_msgs::Marker buildMarker(const geometry_msgs::Point &p0, const geometry_msgs::Point &p1, const std::string &frame);
+  visualization_msgs::Marker addToMarkerPath(const geometry_msgs::Point &p_old, const geometry_msgs::Point &p_new,
+                                             const std::string &frame);
 
   void console(const std::string &caller_name, std::stringstream &message, const int &log_level);
 };

@@ -74,6 +74,7 @@ AgentCore::AgentCore() {
   private_node_handle_->param("sync_service", sync_service_name_, std::string(DEFAULT_SYNC_SERVICE));
   private_node_handle_->param("marker_topic", marker_topic_name_, std::string(DEFAULT_MARKER_TOPIC));
   private_node_handle_->param("marker_path_lifetime", marker_path_lifetime_, DEFAULT_MARKER_PATH_LIFETIME);
+  private_node_handle_->param("enable_path", enable_path_, true);
   private_node_handle_->param("fixed_frame", fixed_frame_, std::string(DEFAULT_FIXED_FRAME));
   private_node_handle_->param("frame_base_name", frame_base_name_, std::string(DEFAULT_FRAME_BASE_NAME));
   private_node_handle_->param("frame_virtual_suffix", frame_virtual_suffix_, std::string(DEFAULT_FRAME_VIRTUAL_SUFFIX));
@@ -104,7 +105,9 @@ void AgentCore::algorithmCallback(const ros::TimerEvent &timer_event) {
 }
 
 void AgentCore::broadcastPath(const geometry_msgs::Pose &pose_new, const geometry_msgs::Pose &pose_old, const std::string &frame) {
-  marker_publisher_.publish(buildMarker(pose_old.position, pose_new.position, frame));
+  if (enable_path_) {
+    marker_publisher_.publish(addToMarkerPath(pose_old.position, pose_new.position, frame));
+  }
 }
 
 void AgentCore::broadcastPose(const geometry_msgs::Pose &pose, const std::string &frame) {
@@ -113,7 +116,8 @@ void AgentCore::broadcastPose(const geometry_msgs::Pose &pose, const std::string
   tf_broadcaster_.sendTransform(tf::StampedTransform(p, ros::Time::now(), fixed_frame_, frame));
 }
 
-visualization_msgs::Marker AgentCore::buildMarker(const geometry_msgs::Point &p0, const geometry_msgs::Point &p1, const std::string &frame) {
+visualization_msgs::Marker AgentCore::addToMarkerPath(const geometry_msgs::Point &p_old, const geometry_msgs::Point &p_new,
+                                                      const std::string &frame) {
   visualization_msgs::Marker marker;
   marker.header.frame_id = fixed_frame_;
   marker.header.stamp = ros::Time(0);
@@ -135,10 +139,10 @@ visualization_msgs::Marker AgentCore::buildMarker(const geometry_msgs::Point &p0
     marker.color.g = 0.5;
     marker.color.b = 1.0;
   }
-  marker.points.push_back(p0);
-  marker.points.push_back(p1);
+  marker.points.push_back(p_old);
+  marker.points.push_back(p_new);
   // relative pose is zero: the frame is already properly centered and rotated
-  marker.scale.x = 0.1;
+  marker.scale.x = 0.1;  // TODO param
 
   return marker;
 }
