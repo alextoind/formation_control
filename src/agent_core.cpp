@@ -11,7 +11,6 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <ground_station_core.h>
 #include "agent_core.h"
 
 AgentCore::AgentCore() {
@@ -35,9 +34,9 @@ AgentCore::AgentCore() {
   private_node_handle_->param("vehicle_length", vehicle_length_, (double)DEFAULT_VEHICLE_LENGTH);
   private_node_handle_->param("world_limit", world_limit_, (double)DEFAULT_WORLD_LIMIT);
 
-  const std::vector<double> DEFAULT_DIAG_ELEMENTS_GAMMA = {500, 500, 25, 25, 25};
-  const std::vector<double> DEFAULT_DIAG_ELEMENTS_LAMBDA = {10, 10, 10, 10, 10};
-  const std::vector<double> DEFAULT_DIAG_ELEMENTS_B = {50, 50};
+  const std::vector<double> DEFAULT_DIAG_ELEMENTS_GAMMA = {100, 100, 5, 10, 5};
+  const std::vector<double> DEFAULT_DIAG_ELEMENTS_LAMBDA = {0, 0, 0, 0, 0};
+  const std::vector<double> DEFAULT_DIAG_ELEMENTS_B = {100, 100};
   std::vector<double> diag_elements_gamma;
   std::vector<double> diag_elements_lambda;
   std::vector<double> diag_elements_b;
@@ -147,6 +146,10 @@ visualization_msgs::Marker AgentCore::buildMarker(const geometry_msgs::Point &p0
 void AgentCore::consensus() {
   Eigen::RowVectorXd x = statsMsgToVector(estimated_statistics_);
   Eigen::MatrixXd x_j = statsMsgToMatrix(received_statistics_);
+  std::stringstream s;
+  s << "Received statistics \n" << x_j;
+  console(__func__, s, DEBUG);
+
   // clears the private variable for following callbacks
   received_statistics_.clear();
   // time derivative of phi(p) = [px, py, pxx, pxy, pyy]
@@ -156,11 +159,20 @@ void AgentCore::consensus() {
               pose_virtual_.position.y*twist_virtual_.linear.x + pose_virtual_.position.x*twist_virtual_.linear.y,
               2*pose_virtual_.position.y*twist_virtual_.linear.y;
 
+  double convergence_consensus_limit = 1.0/(x_j.rows() + 1);  // 1/deg_max >> (I - t*L) is primitive
+  if (sample_time_ >= convergence_consensus_limit) {
+    s << "The current sample time (" << sample_time_
+      << ") does not guarantee the consensus convergence (upper bound: " << convergence_consensus_limit << ").";
+    console(__func__, s, ERROR);
+  }
+
   // dynamic discrete consensus: x_k+1 = z_dot_k*S + (I - S*L)x_k = z_dot_k*S + x_k + S*sum_j(x_j_k - x_k)
   x += phi_dot_*sample_time_ + (x_j.rowwise() - x).colwise().sum()*sample_time_;
 
   estimated_statistics_ = statsVectorToMsg(x);
-  ROS_DEBUG_STREAM("[AgentCore::consensus] Estimated statistics: [" << x << "].");
+
+  s << "Estimated statistics (" << x << ").";
+  console(__func__, s, INFO);
 
   agent_test::FormationStatisticsStamped msg;
   msg.header.frame_id = agent_virtual_frame_;
@@ -168,6 +180,28 @@ void AgentCore::consensus() {
   msg.agent_id = agent_id_;
   msg.stats = estimated_statistics_;
   stats_publisher_.publish(msg);
+}
+
+void AgentCore::console(const std::string &caller_name, std::stringstream &message, const int &log_level) {
+  std::stringstream s;
+  s << "[AgentCore::" << caller_name << "::Agent_" << agent_id_ << "]  " << message.str();
+
+  if (log_level < WARN) {  // error messages
+    ROS_ERROR_STREAM(s.str());
+  }
+  else if (log_level == WARN) {  // warn messages
+    ROS_WARN_STREAM(s.str());
+  }
+  else if (log_level == INFO) {  // info messages
+    ROS_INFO_STREAM(s.str());
+  }
+  else if (log_level > INFO && log_level <= verbosity_level_) {  // debug messages
+    ROS_DEBUG_STREAM(s.str());
+  }
+
+  // clears the stringstream passed to this method
+  message.clear();
+  message.str(std::string());
 }
 
 void AgentCore::control() {
@@ -180,7 +214,7 @@ void AgentCore::control() {
 
   // twist_virtual = inv(B + Jphi'*lambda*Jphi) * Jphi' * gamma * stats_error
   Eigen::VectorXd control_law = (b_ + jacob_phi_.transpose()*lambda_*jacob_phi_).inverse()
-                                * jacob_phi_.transpose()*gamma_*stats_error;
+                                *jacob_phi_.transpose()*gamma_*stats_error;
 
   // control command saturation
   double current_velocity_virtual = std::sqrt(std::pow(control_law(0),2) + std::pow(control_law(1),2));
@@ -195,12 +229,15 @@ void AgentCore::control() {
   twist_virtual_.linear.x = control_law(0);
   twist_virtual_.linear.y = control_law(1);
 
-  ROS_DEBUG_STREAM("[AgentCore::control] Agent " << agent_id_ << " stats error: " << (Eigen::RowVectorXd)stats_error);
-  ROS_DEBUG_STREAM("[AgentCore::control] Agent " << agent_id_ << " control law: " << (Eigen::RowVectorXd)control_law);
-  ROS_DEBUG_STREAM("[AgentCore::control] Virtual agent pose (x: " << pose_virtual_.position.x
-                   << ", y: " << pose_virtual_.position.y << ")");
-  ROS_DEBUG_STREAM("[AgentCore::control] Virtual agent twist (x: " << twist_virtual_.linear.x
-                   << ", y: " << twist_virtual_.linear.y << ")");
+  std::stringstream s;
+  s << "Statistics error (" << (Eigen::RowVectorXd)stats_error << ").";
+  console(__func__, s, DEBUG_V);
+  s << "Control commands (" << (Eigen::RowVectorXd)control_law << ").";
+  console(__func__, s, DEBUG_VV);
+  s << "Virtual pose (" << pose_virtual_.position.x << ", " << pose_virtual_.position.y << ").";
+  console(__func__, s, DEBUG_VVV);
+  s << "Virtual twist (" << twist_virtual_.linear.x << ", " << twist_virtual_.linear.y << ").";
+  console(__func__, s, DEBUG_VVV);
 
   broadcastPose(pose_virtual_, agent_virtual_frame_);
   broadcastPath(pose_virtual_, pose_old, agent_virtual_frame_);
@@ -209,7 +246,7 @@ void AgentCore::control() {
 void AgentCore::dynamics() {
   double theta = getTheta(pose_.orientation);
   double x_dot_new = speed_command_sat_ * std::cos(theta);
-  double y_dot_new = twist_.linear.y = speed_command_sat_ * std::sin(theta);
+  double y_dot_new = speed_command_sat_ * std::sin(theta);
   double theta_dot_new = speed_command_sat_ / vehicle_length_ * std::tan(steer_command_sat_);
 
   geometry_msgs::Pose pose_old = pose_;
@@ -220,8 +257,13 @@ void AgentCore::dynamics() {
   twist_.linear.y = y_dot_new;
   twist_.angular.z = theta_dot_new;
 
-  ROS_DEBUG_STREAM("[AgentCore::dynamics] Agent pose (x: " << pose_.position.x << ", y: " << pose_.position.y << ")");
-  ROS_DEBUG_STREAM("[AgentCore::dynamics] Agent twist (x: " << twist_.linear.x << ", y: " << twist_.linear.y << ")");
+  std::stringstream s;
+  s << "Pose (" << pose_.position.x << ", " << pose_.position.y << ").";
+  console(__func__, s, DEBUG_VVV);
+  s << "Twist (" << twist_.linear.x << ", " << twist_.linear.y << ").";
+  console(__func__, s, DEBUG_VVV);
+  s << "System state (" << x_dot_new << ", " << y_dot_new << ", " << theta_dot_new << ").";
+  console(__func__, s, DEBUG_VVVV);
 
   broadcastPose(pose_, agent_frame_);
   broadcastPath(pose_, pose_old, agent_frame_);
@@ -242,22 +284,34 @@ double AgentCore::getTheta(const geometry_msgs::Quaternion &quat) {
 void AgentCore::guidance() {
   double los_distance = std::sqrt(std::pow(pose_virtual_.position.x - pose_.position.x, 2)
                                   + std::pow(pose_virtual_.position.y - pose_.position.y, 2));
-  // std::atan2 automatically handle the los_distance == 0 case >> los_angle = 0 TODO: try with velocty instead of position
-  double los_angle = std::atan2(pose_virtual_.position.y - pose_.position.y, pose_virtual_.position.x - pose_.position.x);
+  // std::atan2 automatically handle the los_distance == 0 case >> los_angle = 0
+  double los_angle = std::atan2(pose_virtual_.position.y - pose_.position.y,
+                                pose_virtual_.position.x - pose_.position.x);
 
   // the speed reference is a proportional value based on the LOS distance (with a saturation)
-  double speed_reference = std::min(speed_max_* los_distance /los_distance_threshold_, speed_max_);
+  double speed_reference = saturation(speed_max_*los_distance/los_distance_threshold_, speed_min_, speed_max_);
   double speed_error_old = speed_error_;
   speed_error_ = speed_reference - std::sqrt(std::pow(twist_.linear.x, 2) + std::pow(twist_.linear.y, 2));
   speed_integral_ = integrator(speed_integral_, speed_error_old, speed_error_, k_i_speed_);
   double speed_command = k_p_speed_*(speed_error_ + speed_integral_);
   speed_command_sat_ = saturation(speed_command, speed_min_, speed_max_);
 
-  double steer_command = k_p_steer_*angles::normalize_angle(los_angle - getTheta(pose_.orientation));
+  double steer_command = k_p_steer_*angles::shortest_angular_distance(getTheta(pose_.orientation), los_angle);
   steer_command_sat_ = saturation(steer_command, steer_min_, steer_max_);
 
-  ROS_DEBUG_STREAM("[AgentCore::guidance] Speed command: " << speed_command_sat_);
-  ROS_DEBUG_STREAM("[AgentCore::guidance] Steer command: " << steer_command_sat_);
+  // there is no need to get sub-centimeter accuracy
+  floor(speed_command_sat_, 2);
+  floor(steer_command_sat_, 2);
+
+  std::stringstream s;
+  s << "Guidance commands (" << speed_command_sat_ << ", " << steer_command_sat_ << ").";
+  console(__func__, s, DEBUG_VV);
+  s << "LOS distance and angle (" << los_distance << ", " << los_angle << ").";
+  console(__func__, s, DEBUG_VVVV);
+}
+
+void AgentCore::floor(double &d, const int &precision) {
+  d = std::floor(d*std::pow(10, precision)) / std::pow(10, precision);
 }
 
 double AgentCore::integrator(const double &out_old, const double &in_old, const double &in_new, const double &k) {
@@ -266,16 +320,25 @@ double AgentCore::integrator(const double &out_old, const double &in_old, const 
 
 void AgentCore::receivedStatsCallback(const agent_test::FormationStatisticsArray &received) {
   if (!received_statistics_.empty()) {
-    ROS_ERROR_STREAM("[AgentCore::receivedStatsCallback] Last received statistics has not been used.");
+    std::stringstream s;
+    s << "Last received statistics has not been used.";
+    console(__func__, s, ERROR);
     received_statistics_.clear();
   }
-  neighbours_ = received.neighbours_;  // updates current neighbourhood
+  // updates current neighbourhood and deletes the personal id from the list
+  neighbours_ = received.neighbours_;
+  neighbours_.erase(std::remove(std::begin(neighbours_), std::end(neighbours_), agent_id_), std::end(neighbours_));
   for (auto const &data : received.vector) {
     if (std::find(std::begin(neighbours_), std::end(neighbours_), data.agent_id) != std::end(neighbours_)) {
       received_statistics_.push_back(data.stats);
     }
   }
-  ROS_DEBUG_STREAM("[AgentCore::receivedStatsCallback] Received statistics from " << received_statistics_.size() << " agents.");
+  std::stringstream s, agents;
+  s << "Received statistics from " << received_statistics_.size()  << " other agents.";
+  console(__func__, s, DEBUG);
+  std::copy(std::begin(neighbours_), std::end(neighbours_), std::ostream_iterator<int>(agents, ", "));
+  s << "Received statistics from (" << agents.str()  << ").";
+  console(__func__, s, DEBUG_VVVV);
 }
 
 double AgentCore::saturation(const double &value, const double &min, const double &max) {
@@ -288,8 +351,10 @@ void AgentCore::setTheta(geometry_msgs::Quaternion &quat, const double &theta) {
                                   * Eigen::AngleAxisd(rpy(1), Eigen::Vector3d::UnitY())
                                   * Eigen::AngleAxisd(theta, Eigen::Vector3d::UnitZ());
   tf::quaternionEigenToMsg(eigen_quat, quat);
-  ROS_DEBUG_STREAM("[AgentCore::setTheta] Quaternion updated (theta " << theta << "): [" << quat.x << ", " << quat.y
-                   << ", " << quat.z << ", " << quat.w << "].");
+
+  std::stringstream s;
+  s << "Quaternion updated (" << quat.x << ", " << quat.y << ", " << quat.z << ", " << quat.w << ").";
+  console(__func__, s, DEBUG_VVVV);
 }
 
 Eigen::MatrixXd AgentCore::statsMsgToMatrix(const std::vector<agent_test::FormationStatistics> &msg) {
@@ -297,7 +362,6 @@ Eigen::MatrixXd AgentCore::statsMsgToMatrix(const std::vector<agent_test::Format
   for (int i=0; i<msg.size(); i++) {
     matrix.row(i) = statsMsgToVector(msg.at(i));
   }
-  ROS_DEBUG_STREAM("[AgentCore::statsMsgToMatrix] Received statistics:  [" << matrix << "].");
   return matrix;
 }
 
@@ -310,7 +374,9 @@ Eigen::VectorXd AgentCore::statsMsgToVector(const agent_test::FormationStatistic
 agent_test::FormationStatistics AgentCore::statsVectorToMsg(const Eigen::VectorXd &vector) {
   agent_test::FormationStatistics msg;
   if (vector.size() != number_of_stats_) {
-    ROS_ERROR_STREAM("[AgentCore::statsVectorToMsg] Wrong statistics vector size (" << vector.size() << ")");
+    std::stringstream s;
+    s << "Wrong statistics vector size (" << vector.size() << ").";
+    console(__func__, s, ERROR);
     return msg;
   }
   msg.m_x = vector(0);
@@ -330,9 +396,12 @@ agent_test::FormationStatistics AgentCore::statsVectorToMsg(const std::vector<do
 void AgentCore::targetStatsCallback(const agent_test::FormationStatisticsStamped &target) {
   target_statistics_ = target.stats;
 
-  ROS_INFO_STREAM("[AgentCore::targetStatsCallback] Target statistics has been changed.");
-  ROS_DEBUG_STREAM("[AgentCore::targetStatsCallback] New values: Mx=" << target.stats.m_x << ", My=" << target.stats.m_y
-                   << ", Mxx=" << target.stats.m_xx << ", Mxy=" << target.stats.m_xy << ", Myy=" << target.stats.m_yy);
+  std::stringstream s;
+  s << "Target statistics has been changed.";
+  console(__func__, s, INFO);
+  s << "New target statistics (" << target.stats.m_x << ", " << target.stats.m_y << ", " << target.stats.m_xx << ", "
+    << target.stats.m_xy << ", " << target.stats.m_yy << ").";
+  console(__func__, s, DEBUG_VVVV);
 }
 
 void AgentCore::waitForSyncTime() {
@@ -345,10 +414,14 @@ void AgentCore::waitForSyncTime() {
     agent_frame_ = frame_base_name_ + std::to_string(agent_id_);
     agent_virtual_frame_ = agent_frame_ + frame_virtual_suffix_;
 
-    ROS_DEBUG_STREAM("[AgentCore::waitForSyncTime] Wait for synchronization deadline (" << srv.response.sync_time << ")");
+    std::stringstream s;
+    s << "Wait for synchronization deadline (" << srv.response.sync_time << ").";
+    console(__func__, s, INFO);
     ros::Time::sleepUntil(srv.response.sync_time);
   }
   else {
-    ROS_ERROR_STREAM("[AgentCore::waitForSyncTime] Can't get synchronization time from the server (Ground Station)");
+    std::stringstream s;
+    s << "Can't get the synchronization time from the Ground Station server.";
+    console(__func__, s, ERROR);
   }
 }

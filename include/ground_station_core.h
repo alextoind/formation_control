@@ -44,7 +44,8 @@
 // license info to be displayed at the beginning
 #define LICENSE_INFO "\n*\n* Copyright (C) 2015 Alessandro Tondo\n* This program comes with ABSOLUTELY NO WARRANTY.\n* This is free software, and you are welcome to\n* redistribute it under GNU GPL v3.0 conditions.\n* (for details see <http://www.gnu.org/licenses/>).\n*\n\n"
 // default values for ROS params (if not specified by the user)
-#define DEFAULT_SAMPLE_TIME 0.25  // expressed in seconds
+#define DEFAULT_VERBOSITY_LEVEL 1
+#define DEFAULT_SAMPLE_TIME 0.1  // expressed in seconds
 #define DEFAULT_TOPIC_QUEUE_LENGTH 1
 #define DEFAULT_SHARED_STATS_TOPIC "shared_stats"
 #define DEFAULT_RECEIVED_STATS_TOPIC "received_stats"
@@ -60,6 +61,16 @@
 #define DEFAULT_MARKER_STEER_MIN -0.52
 #define DEFAULT_MARKER_STEER_MAX 0.52
 #define DEFAULT_SYNC_DELAY 5.0  // expressed in seconds
+
+#define FATAL -3
+#define ERROR -2
+#define WARN -1
+#define INFO 0
+#define DEBUG 1
+#define DEBUG_V 2
+#define DEBUG_VV 3
+#define DEBUG_VVV 4
+#define DEBUG_VVVV 5
 
 // TODO: add critical failure handler
 
@@ -110,6 +121,7 @@ class GroundStationCore {
   double marker_steer_min_;
   double marker_steer_max_;
 
+  int verbosity_level_;
 
   void algorithmCallback(const ros::TimerEvent &timer_event);
   void sharedStatsCallback(const agent_test::FormationStatisticsStamped &shared);
@@ -120,6 +132,7 @@ class GroundStationCore {
   bool checkCollision(const int &id);
   int extractFirstID();
 
+  agent_test::FormationStatistics statsVectorPhysicsToMsg(const std::vector<double> &vector);
   agent_test::FormationStatistics statsVectorToMsg(const std::vector<double> &vector);
   agent_test::FormationStatisticsStamped statsVectorToMsg(const std::string &frame, const int &id,
                                                           const std::vector <double> &vector);
@@ -129,7 +142,8 @@ class GroundStationCore {
   agent_test::FormationStatistics physicsToStats(const geometry_msgs::Pose &pose, const double &a_x, const double &a_y);
   void thetaCorrection(double &theta, const double &theta_old);
 
-  double diameter(const double &a);
+  double computeA(const double &diameter) const;
+  double computeDiameter(const double &a) const;
   void updateSpanningEllipse(const agent_test::FormationStatisticsStamped &msg);
   visualization_msgs::Marker makeEllipse(const double &diameter_x, const double &diameter_y, const std::string &frame,
                                          const int &id);
@@ -146,7 +160,12 @@ class GroundStationCore {
   void updateTarget(const agent_test::FormationStatistics &target);
   void updateTargetStats(const agent_test::FormationStatistics &target);
 
- double saturation(const double &value, const double &min, const double &max);
+  double saturation(const double &value, const double &min, const double &max);
+
+  void console(const std::string &caller_name, std::stringstream &message, const int &log_level);
+
+  void computeEffectiveEllipse(const std::string &frame_suffix);
+  agent_test::FormationStatistics computeStatsFromPoses(const std::vector<geometry_msgs::Pose> &poses);
 };
 
 #endif

@@ -41,20 +41,20 @@
 #include "agent_test/FormationStatisticsArray.h"
 #include <agent_test/Sync.h>
 // default values for ROS params (if not specified by the user)
-#define DEFAULT_VERBOSITY_LEVEL 0
+#define DEFAULT_VERBOSITY_LEVEL 1
 #define DEFAULT_NUMBER_OF_STATS 5  // see FormationStatistics.msg (mx, my, mxx, mxy, myy)
 #define DEFAULT_NUMBER_OF_VELOCITIES 2  // virtual planar linear twist (virtual_x_dot, virutal_y_dot)
 #define DEFAULT_AGENT_ID 0  // if not setted by the user, the Ground Station will choose an unique value
-#define DEFAULT_SAMPLE_TIME 0.25  // expressed in seconds
-#define DEFAULT_VELOCITY_VIRTUAL_THRESHOLD 10.0  // expressed in meters/second
+#define DEFAULT_SAMPLE_TIME 0.1  // expressed in seconds
+#define DEFAULT_VELOCITY_VIRTUAL_THRESHOLD 2.0  // expressed in meters/second
 #define DEFAULT_LOS_DISTANCE_THRESHOLD 4.0
 #define DEFAULT_SPEED_MIN 0.0  // expressed in meters/second
 #define DEFAULT_SPEED_MAX 4.0  // expressed in meters/second
 #define DEFAULT_STEER_MIN -0.52  // expressed in radiants
 #define DEFAULT_STEER_MAX 0.52  // expressed in radiants
-#define DEFAULT_K_P_SPEED 1.0
-#define DEFAULT_K_I_SPEED 0.05
-#define DEFAULT_K_P_STEER 0.5
+#define DEFAULT_K_P_SPEED 0.5
+#define DEFAULT_K_I_SPEED 0.0
+#define DEFAULT_K_P_STEER 1.5
 #define DEFAULT_VEHICLE_LENGTH 0.4  // expressed in meters
 #define DEFAULT_WORLD_LIMIT 5.0  // in meters, considering a "square world" (only for random pose generation)
 #define DEFAULT_TOPIC_QUEUE_LENGTH 1
@@ -69,9 +69,19 @@
 #define DEFAULT_FRAME_BASE_NAME "agent_"
 #define DEFAULT_FRAME_VIRTUAL_SUFFIX "_virtual"
 
-// TODO: extend the algorithm to work in 3D even if our approximation is in 2D
-// TODO: add a debug verbosity level and improve debug messages
+#define FATAL -3
+#define ERROR -2
+#define WARN -1
+#define INFO 0
+#define DEBUG 1
+#define DEBUG_V 2
+#define DEBUG_VV 3
+#define DEBUG_VVV 4
+#define DEBUG_VVVV 5
+
 // TODO: choose properly which variables has to be ROS params (for both classes)
+// TODO: extract common functions in an external library
+// TODO: make functions const
 
 
 class AgentCore {
@@ -160,8 +170,9 @@ class AgentCore {
   Eigen::VectorXd statsMsgToVector(const agent_test::FormationStatistics &msg);
   Eigen::MatrixXd statsMsgToMatrix(const std::vector <agent_test::FormationStatistics> &msg);
   agent_test::FormationStatistics statsVectorToMsg(const Eigen::VectorXd &vector);
-  agent_test::FormationStatistics statsVectorToMsg(const std::vector <double> &vector);
+  agent_test::FormationStatistics statsVectorToMsg(const std::vector<double> &vector);
 
+  void floor(double &d, const int &precision);
   double integrator(const double &out_old, const double &in_old, const double &in_new, const double &k);
   double saturation(const double &value, const double &min, const double &max);
 
@@ -174,6 +185,8 @@ class AgentCore {
   void broadcastPath(const geometry_msgs::Pose &pose_new, const geometry_msgs::Pose &pose_old, const std::string &frame);
   void broadcastPose(const geometry_msgs::Pose &pose, const std::string &frame);
   visualization_msgs::Marker buildMarker(const geometry_msgs::Point &p0, const geometry_msgs::Point &p1, const std::string &frame);
+
+  void console(const std::string &caller_name, std::stringstream &message, const int &log_level);
 };
 
 #endif
