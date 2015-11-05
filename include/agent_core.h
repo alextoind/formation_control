@@ -56,7 +56,7 @@
 #define DEFAULT_K_I_SPEED 0.0
 #define DEFAULT_K_P_STEER 1.5
 #define DEFAULT_VEHICLE_LENGTH 0.4  // expressed in meters
-#define DEFAULT_WORLD_LIMIT 5.0  // in meters, considering a "square world" (only for random pose generation)
+#define DEFAULT_WORLD_LIMIT 1.0  // in meters, considering a "square world" (only for random pose generation)
 #define DEFAULT_TOPIC_QUEUE_LENGTH 1
 #define DEFAULT_SHARED_STATS_TOPIC "shared_stats"
 #define DEFAULT_RECEIVED_STATS_TOPIC "received_stats"

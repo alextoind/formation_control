@@ -1,5 +1,4 @@
 <launch>
-<launch>
   <env name="ROSCONSOLE_CONFIG_FILE" value="$(find agent_test)/config/rosconsole_debug_enabled.conf"/>
 
   <node pkg="tf" type="static_transform_publisher" name="fixed_frame_pub" args="0.0 0.0 0.0 0.0 0.0 0.0 map map_origin 100" />
@@ -9,14 +8,7 @@
     <rosparam command="load" file="$(find agent_test)/config/ground_station_initialization.yaml" />
   </node>
 
-  <arg name="id_1" value="1"/>
-  <node pkg="agent_test" type="agent_test" name="agent_$(arg id_1)" output="screen" cwd="ROS_HOME">
-    <param name="x" type="double" value="-0.5" />
-    <param name="y" type="double" value="-0.5" />
-    <param name="theta" type="double" value="0.0" />
-    <param name="agent_id" type="int" value="$(arg id_1)" />
-    <rosparam command="load" file="$(find agent_test)/config/agent_initialization.yaml" />
-  </node>
+  <!-- agent 0 is handled by MATLAB node -->
 
   <arg name="id_2" value="2"/>
   <node pkg="agent_test" type="agent_test" name="agent_$(arg id_2)" output="screen" cwd="ROS_HOME">

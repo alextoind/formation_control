@@ -84,9 +84,6 @@ void GroundStationCore::algorithmCallback(const ros::TimerEvent &timer_event) {
   s << "Message published.";
   console(__func__, s, DEBUG);
 
-  // clears the private variable for following callbacks
-  shared_statistics_grouped_.clear();
-
   computeEffectiveEllipse("");
   computeEffectiveEllipse("_virtual");
 }
@@ -406,11 +403,28 @@ double GroundStationCore::saturation(const double &value, const double &min, con
 }
 
 void GroundStationCore::sharedStatsCallback(const agent_test::FormationStatisticsStamped &shared) {
-  shared_statistics_grouped_.push_back(shared);
-  updateSpanningEllipse(shared);
+  agent_test::FormationStatisticsStamped msg = shared;
+  if (msg.header.frame_id == "") {  // agent from MATLAB
+    msg.header.frame_id = "agent_" + std::to_string(msg.agent_id) + "_virtual";
+  }
+
+  bool updated = false;
+  for (auto &stat : shared_statistics_grouped_) {
+    if (msg.agent_id == stat.agent_id) {
+      stat = msg;
+      updated = true;
+      break;
+    }
+  }
+  if (!updated) {  // msg.agent_id is a new agent (e.g. from MATLAB)
+    connected_agents_.push_back(msg.agent_id);  // can't be in conflict with other ids
+    shared_statistics_grouped_.push_back(msg);
+  }
+
+  updateSpanningEllipse(msg);
 
   std::stringstream s;
-  s << "Received statistics from " << shared.header.frame_id;
+  s << "Received statistics from " << msg.header.frame_id;
   console(__func__, s, INFO);
 }
 

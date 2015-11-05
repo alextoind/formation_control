@@ -142,7 +142,7 @@ visualization_msgs::Marker AgentCore::addToMarkerPath(const geometry_msgs::Point
   marker.points.push_back(p_old);
   marker.points.push_back(p_new);
   // relative pose is zero: the frame is already properly centered and rotated
-  marker.scale.x = 0.1;  // TODO param
+  marker.scale.x = 0.05;
 
   return marker;
 }
