@@ -14,38 +14,9 @@
 #ifndef GUARD_AGENT_CORE_H
 #define GUARD_AGENT_CORE_H
 
-// Standard libraries
-#include <string>
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <vector>
-#include <map>
-#include <random>
-#include <algorithm>
-// ROS libraries
-#include <ros/ros.h>
-#include <ros/time.h>
-#include <geometry_msgs/Twist.h>
-#include <geometry_msgs/Pose.h>
-#include <angles/angles.h>
-#include <Eigen/Dense>
-#include <eigen_conversions/eigen_msg.h>
-#include <nav_msgs/Path.h>
-#include <tf/transform_broadcaster.h>
-#include <tf/transform_datatypes.h>
-#include <visualization_msgs/Marker.h>
-// Auto-generated from msg/ directory libraries
-#include "agent_test/FormationStatistics.h"
-#include "agent_test/FormationStatisticsStamped.h"
-#include "agent_test/FormationStatisticsArray.h"
-#include <agent_test/Sync.h>
+#include "commons.h"
 // default values for ROS params (if not specified by the user)
-#define DEFAULT_VERBOSITY_LEVEL 1
-#define DEFAULT_NUMBER_OF_STATS 5  // see FormationStatistics.msg (mx, my, mxx, mxy, myy)
-#define DEFAULT_NUMBER_OF_VELOCITIES 2  // virtual planar linear twist (virtual_x_dot, virutal_y_dot)
 #define DEFAULT_AGENT_ID 0  // if not setted by the user, the Ground Station will choose an unique value
-#define DEFAULT_SAMPLE_TIME 0.1  // expressed in seconds
 #define DEFAULT_VELOCITY_VIRTUAL_THRESHOLD 2.0  // expressed in meters/second
 #define DEFAULT_LOS_DISTANCE_THRESHOLD 4.0
 #define DEFAULT_SPEED_MIN 0.0  // expressed in meters/second
@@ -57,30 +28,7 @@
 #define DEFAULT_K_P_STEER 1.5
 #define DEFAULT_VEHICLE_LENGTH 0.4  // expressed in meters
 #define DEFAULT_WORLD_LIMIT 1.0  // in meters, considering a "square world" (only for random pose generation)
-#define DEFAULT_TOPIC_QUEUE_LENGTH 1
-#define DEFAULT_SHARED_STATS_TOPIC "shared_stats"
-#define DEFAULT_RECEIVED_STATS_TOPIC "received_stats"
-#define DEFAULT_TARGET_STATS_TOPIC "target_stats"
-#define DEFAULT_MARKER_TOPIC "visualization_marker"
-#define DEFAULT_SYNC_SERVICE "sync_agent"
-#define DEFAULT_SYNC_TIMEOUT 10.0  // expressed in seconds
 #define DEFAULT_MARKER_PATH_LIFETIME 30  // expressed in seconds
-#define DEFAULT_FIXED_FRAME "map"
-#define DEFAULT_FRAME_BASE_NAME "agent_"
-#define DEFAULT_FRAME_VIRTUAL_SUFFIX "_virtual"
-
-#define FATAL -3
-#define ERROR -2
-#define WARN -1
-#define INFO 0
-#define DEBUG 1
-#define DEBUG_V 2
-#define DEBUG_VV 3
-#define DEBUG_VVV 4
-#define DEBUG_VVVV 5
-
-// TODO: choose properly which variables has to be ROS params (for both classes)
-// TODO: extract common functions in an external library
 
 
 class AgentCore {
@@ -102,8 +50,8 @@ class AgentCore {
   bool enable_path_;
   int marker_path_id_;
   int marker_path_lifetime_;
-  std::string fixed_frame_;
-  std::string frame_base_name_;
+  std::string frame_map_;
+  std::string frame_agent_prefix_;
   std::string frame_virtual_suffix_;
   std::string agent_frame_;
   std::string agent_virtual_frame_;

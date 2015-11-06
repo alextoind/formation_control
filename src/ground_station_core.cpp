@@ -17,33 +17,37 @@ GroundStationCore::GroundStationCore() {
   // handles server private parameters (private names are protected from accidental name collisions)
   private_node_handle_ = new ros::NodeHandle("~");
 
-  private_node_handle_->param("verbosity_level", verbosity_level_, DEFAULT_VERBOSITY_LEVEL);
   private_node_handle_->param("sample_time", sample_time_, (double)DEFAULT_SAMPLE_TIME);
+  private_node_handle_->param("number_of_agents", number_of_agents_, DEFAULT_NUMBER_OF_AGENTS);
+  private_node_handle_->param("verbosity_level", verbosity_level_, DEFAULT_VERBOSITY_LEVEL);
   private_node_handle_->param("topic_queue_length", topic_queue_length_, DEFAULT_TOPIC_QUEUE_LENGTH);
   private_node_handle_->param("shared_stats_topic", shared_stats_topic_name_, std::string(DEFAULT_SHARED_STATS_TOPIC));
   private_node_handle_->param("received_stats_topic", received_stats_topic_name_, std::string(DEFAULT_RECEIVED_STATS_TOPIC));
   private_node_handle_->param("target_stats_topic", target_stats_topic_name_, std::string(DEFAULT_TARGET_STATS_TOPIC));
   private_node_handle_->param("matlab_poses_topic", matlab_poses_topic_name_, std::string(DEFAULT_MATLAB_POSES_TOPIC));
-  private_node_handle_->param("sync_service", sync_service_name_, std::string(DEFAULT_SYNC_SERVICE));
   private_node_handle_->param("marker_topic", marker_topic_name_, std::string(DEFAULT_MARKER_TOPIC));
-  private_node_handle_->param("ground_station_frame", ground_station_frame_, std::string(DEFAULT_GROUND_STATION_FRAME));
-  private_node_handle_->param("fixed_frame", fixed_frame_, std::string(DEFAULT_FIXED_FRAME));
-  private_node_handle_->param("target_frame", target_frame_, std::string(DEFAULT_TARGET_FRAME));
-  private_node_handle_->param("frame_base_name", frame_base_name_, std::string(DEFAULT_FRAME_BASE_NAME));
-  private_node_handle_->param("frame_virtual_suffix", frame_virtual_suffix_, std::string(DEFAULT_FRAME_VIRTUAL_SUFFIX));
-  private_node_handle_->param("number_of_agents", number_of_agents_, DEFAULT_NUMBER_OF_AGENTS);
-  private_node_handle_->param("marker_dist_min", marker_dist_min_, (double)DEFAULT_MARKER_DIST_MIN);
-  private_node_handle_->param("marker_dist_max", marker_dist_max_, (double)DEFAULT_MARKER_DIST_MAX);
-  private_node_handle_->param("marker_steer_min", marker_steer_min_, (double)DEFAULT_MARKER_STEER_MIN);
-  private_node_handle_->param("marker_steer_max", marker_steer_max_, (double)DEFAULT_MARKER_STEER_MAX);
+  private_node_handle_->param("sync_service", sync_service_name_, std::string(DEFAULT_SYNC_SERVICE));
   double sync_delay;
   private_node_handle_->param("sync_delay", sync_delay, (double)DEFAULT_SYNC_DELAY);
   sync_delay_ = ros::Duration(sync_delay);
 
+  private_node_handle_->param("frame_map", frame_map_, std::string(DEFAULT_FRAME_MAP));
+  private_node_handle_->param("frame_agent_prefix", frame_agent_prefix_, std::string(DEFAULT_FRAME_AGENT_PREFIX));
+  private_node_handle_->param("frame_effective_prefix", frame_effective_prefix_, std::string(DEFAULT_FRAME_EFFECTIVE_PREFIX));
+  private_node_handle_->param("frame_ellipse_suffix", frame_ellipse_suffix_, std::string(DEFAULT_FRAME_ELLIPSE_SUFFIX));
+  private_node_handle_->param("frame_virtual_suffix", frame_virtual_suffix_, std::string(DEFAULT_FRAME_VIRTUAL_SUFFIX));
+  private_node_handle_->param("frame_ground_station", frame_ground_station_, std::string(DEFAULT_FRAME_GROUND_STATION));
+  private_node_handle_->param("frame_target_ellipse", frame_target_ellipse_, target_stats_topic_name_ + frame_ellipse_suffix_);
+
+  private_node_handle_->param("marker_dist_min", marker_dist_min_, (double)DEFAULT_MARKER_DIST_MIN);
+  private_node_handle_->param("marker_dist_max", marker_dist_max_, (double)DEFAULT_MARKER_DIST_MAX);
+  private_node_handle_->param("marker_steer_min", marker_steer_min_, (double)DEFAULT_MARKER_STEER_MIN);
+  private_node_handle_->param("marker_steer_max", marker_steer_max_, (double)DEFAULT_MARKER_STEER_MAX);
+
   std::vector<double> target_values;
   const std::vector<double> DEFAULT_TARGET_STATS = {0, 0, 1, 0, 1};
   private_node_handle_->param("target_statistics", target_values, DEFAULT_TARGET_STATS);
-  target_statistics_.header.frame_id = "target_stats";
+  target_statistics_.header.frame_id = target_stats_topic_name_;
 
   bool target_from_physics;
   private_node_handle_->param("target_from_physics", target_from_physics, false);
@@ -78,7 +82,7 @@ GroundStationCore::~GroundStationCore() {
 
 void GroundStationCore::algorithmCallback(const ros::TimerEvent &timer_event) {
   agent_test::FormationStatisticsArray msg;
-  msg.header.frame_id = ground_station_frame_;
+  msg.header.frame_id = frame_ground_station_;
   msg.header.stamp = ros::Time::now();
   msg.neighbours_ = connected_agents_;
   msg.vector = shared_statistics_grouped_;
@@ -107,18 +111,18 @@ double GroundStationCore::computeDiameter(const double &a) const {
 void GroundStationCore::computeEffectiveEllipse(const std::string &frame_suffix) {
   std::vector<geometry_msgs::Pose> agent_poses;
   for (auto const &id : connected_agents_) {
-    std::string frame = frame_base_name_ + std::to_string(id) + frame_suffix;
-    if (tf_listener_.canTransform(fixed_frame_, frame, ros::Time(0))) {
+    std::string frame = frame_agent_prefix_ + std::to_string(id) + frame_suffix;
+    if (tf_listener_.canTransform(frame_map_, frame, ros::Time(0))) {
       tf::StampedTransform pose_tf;
       geometry_msgs::Pose pose_msg;
-      tf_listener_.lookupTransform(fixed_frame_, frame, ros::Time(0), pose_tf);
+      tf_listener_.lookupTransform(frame_map_, frame, ros::Time(0), pose_tf);
       tf::poseTFToMsg(pose_tf, pose_msg);
       agent_poses.push_back(pose_msg);
     }
   }
   
   agent_test::FormationStatisticsStamped effective_statistics;
-  effective_statistics.header.frame_id = "effective_stats" + frame_suffix;
+  effective_statistics.header.frame_id = frame_effective_prefix_ + frame_suffix;
   effective_statistics.header.stamp = ros::Time::now();
   effective_statistics.stats = computeStatsFromPoses(agent_poses);
   updateSpanningEllipse(effective_statistics);
@@ -233,7 +237,7 @@ void GroundStationCore::interactiveMarkerInitialization() {
 
   geometry_msgs::Pose pose;
   tf::Transform translate;
-  translate.setIdentity();  // null pose (it is centered in the 'target_frame_' frame)
+  translate.setIdentity();  // null pose (it is centered in the 'frame_target_ellipse_' frame)
 
   translate.setOrigin(tf::Vector3(computeDiameter(target_a_x_)/2, 0, 0));
   tf::poseTFToMsg(translate, pose);
@@ -267,7 +271,6 @@ void GroundStationCore::makeBoxControl(visualization_msgs::InteractiveMarker &in
   interactive_marker.controls.push_back(control);
 }
 
-// TODO use params for namespaces and frames
 visualization_msgs::Marker GroundStationCore::makeEllipse(const double &diameter_x, const double &diameter_y,
                                                           const std::string &frame, const int &id) const {
   visualization_msgs::Marker marker;
@@ -278,29 +281,29 @@ visualization_msgs::Marker GroundStationCore::makeEllipse(const double &diameter
   marker.action = visualization_msgs::Marker::MODIFY;
   marker.id = id;
   marker.frame_locked = true;
-  if (frame == target_frame_) {
-    marker.ns = "target_spanning_ellipse";
+  if (frame == frame_target_ellipse_) {
+    marker.ns = target_stats_topic_name_ + "spanning_ellipse";
     marker.color.a = 0.5;
     marker.color.r = 1.0;
     marker.color.g = 0.5;
     marker.color.b = 0.0;
   }
-  else if (frame == "effective_stats_ellipse") {
-    marker.ns = "effective_spanning_ellipse";
+  else if (frame == frame_effective_prefix_ + frame_ellipse_suffix_) {
+    marker.ns = frame_effective_prefix_ + "spanning_ellipse";
     marker.color.a = 0.1;
     marker.color.r = 0.5;
     marker.color.g = 0.5;
     marker.color.b = 0.5;
   }
-  else if (frame == "effective_stats_virtual_ellipse") {
-    marker.ns = "effective_virtual_spanning_ellipse";
+  else if (frame == frame_effective_prefix_ + frame_virtual_suffix_ + frame_ellipse_suffix_) {
+    marker.ns = frame_effective_prefix_ + frame_virtual_suffix_ + "spanning_ellipse";
     marker.color.a = 0.1;
     marker.color.r = 0.5;
     marker.color.g = 0.5;
     marker.color.b = 0.5;
   }
   else {
-    marker.ns = frame_base_name_ + "spanning_ellipse";
+    marker.ns = frame_agent_prefix_ + "spanning_ellipse";
     marker.color.a = 0.25;
     marker.color.r = 0.0;
     marker.color.g = 0.5;
@@ -323,7 +326,7 @@ void GroundStationCore::makeInteractiveMarkerAxis(const geometry_msgs::Pose &pos
   }
 
   visualization_msgs::InteractiveMarker interactive_marker;
-  interactive_marker.header.frame_id = target_frame_;
+  interactive_marker.header.frame_id = frame_target_ellipse_;
   interactive_marker.name = "stats_modifier_axis_" + axis;
   interactive_marker.description = "Real-time target statistics modifier (affects only axis dimensions).";
   interactive_marker.pose = pose;
@@ -355,7 +358,7 @@ void GroundStationCore::makeInteractiveMarkerAxis(const geometry_msgs::Pose &pos
 
 void GroundStationCore::makeInteractiveMarkerPose(const geometry_msgs::Pose &pose) {
   visualization_msgs::InteractiveMarker interactive_marker;
-  interactive_marker.header.frame_id = fixed_frame_;
+  interactive_marker.header.frame_id = frame_map_;
   interactive_marker.name = "stats_modifier_pose";
   interactive_marker.description = "Real-time target statistics modifier (affects only ellipse pose).";
   interactive_marker.pose = pose;
@@ -383,13 +386,13 @@ void GroundStationCore::matlabPosesCallback(const geometry_msgs::Pose &pose) {
   tf::poseMsgToTF(pose, p);
 
   // agent_id is hidden in the meaningless z value (z = id*2)
-  std::string frame = frame_base_name_ + std::to_string((int)pose.position.z / 2);
+  std::string frame = frame_agent_prefix_ + std::to_string((int)pose.position.z / 2);
   if (((int)pose.position.z % 2) != 0) {
     frame += frame_virtual_suffix_;
   }
   p.getOrigin().setZ(0);
 
-  tf_broadcaster_.sendTransform(tf::StampedTransform(p, ros::Time::now(), fixed_frame_, frame));
+  tf_broadcaster_.sendTransform(tf::StampedTransform(p, ros::Time::now(), frame_map_, frame));
 }
 
 agent_test::FormationStatistics GroundStationCore::physicsToStats(const geometry_msgs::Pose &pose, const double &a_x,
@@ -423,7 +426,7 @@ double GroundStationCore::saturation(const double &value, const double &min, con
 void GroundStationCore::sharedStatsCallback(const agent_test::FormationStatisticsStamped &shared) {
   agent_test::FormationStatisticsStamped msg = shared;
   if (msg.header.frame_id == "") {  // agent from MATLAB
-    msg.header.frame_id = frame_base_name_ + std::to_string(msg.agent_id) + frame_virtual_suffix_;
+    msg.header.frame_id = frame_agent_prefix_ + std::to_string(msg.agent_id) + frame_virtual_suffix_;
   }
 
   bool updated = false;
@@ -551,17 +554,17 @@ void GroundStationCore::thetaCorrection(double &theta, const double &theta_old) 
 void GroundStationCore::updateSpanningEllipse(const agent_test::FormationStatisticsStamped &msg) {
   double a_x, a_y;  // will be initialized by statsToPhysics
   double roll_old, pitch_old, yaw_old = std::nan("");  // only yaw_old is really used (thus initialized)
-  std::string frame = msg.header.frame_id + "_ellipse";
+  std::string frame = msg.header.frame_id + frame_ellipse_suffix_;
 
   // retrieves the old pose to correct the new one extracted from statistics (theta from [-pi/2,pi/2] to [-pi,pi])
-  if (frame == target_frame_ && tf_listener_.canTransform(fixed_frame_, frame, ros::Time(0))) {
+  if (frame == frame_target_ellipse_ && tf_listener_.canTransform(frame_map_, frame, ros::Time(0))) {
     tf::StampedTransform pose_old;
-    tf_listener_.lookupTransform(fixed_frame_, frame, ros::Time(0), pose_old);
+    tf_listener_.lookupTransform(frame_map_, frame, ros::Time(0), pose_old);
     tf::Matrix3x3(pose_old.getRotation()).getRPY(roll_old, pitch_old, yaw_old);
   }
 
   tf::Pose pose = statsToPhysics(msg.stats, a_x, a_y, yaw_old);
-  tf_broadcaster_.sendTransform(tf::StampedTransform(pose, ros::Time::now(), fixed_frame_, frame));
+  tf_broadcaster_.sendTransform(tf::StampedTransform(pose, ros::Time::now(), frame_map_, frame));
   marker_publisher_.publish(makeEllipse(computeDiameter(a_x), computeDiameter(a_y), frame, msg.agent_id));
 }
 

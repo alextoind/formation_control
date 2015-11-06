@@ -17,11 +17,11 @@ AgentCore::AgentCore() {
   // handles server private parameters (private names are protected from accidental name collisions)
   private_node_handle_ = new ros::NodeHandle("~");
 
-  private_node_handle_->param("verbosity_level", verbosity_level_, DEFAULT_VERBOSITY_LEVEL);
+  private_node_handle_->param("sample_time", sample_time_, (double)DEFAULT_SAMPLE_TIME);
   private_node_handle_->param("agent_id", agent_id_, DEFAULT_AGENT_ID);
   private_node_handle_->param("number_of_stats", number_of_stats_, DEFAULT_NUMBER_OF_STATS);
   private_node_handle_->param("number_of_velocities", number_of_velocities_, DEFAULT_NUMBER_OF_VELOCITIES);
-  private_node_handle_->param("sample_time", sample_time_, (double)DEFAULT_SAMPLE_TIME);
+  private_node_handle_->param("verbosity_level", verbosity_level_, DEFAULT_VERBOSITY_LEVEL);
   private_node_handle_->param("velocity_virtual_threshold", velocity_virtual_threshold_, (double)DEFAULT_VELOCITY_VIRTUAL_THRESHOLD);
   private_node_handle_->param("los_distance_threshold", los_distance_threshold_, (double)DEFAULT_LOS_DISTANCE_THRESHOLD);
   private_node_handle_->param("speed_min", speed_min_, (double)DEFAULT_SPEED_MIN);
@@ -71,16 +71,17 @@ AgentCore::AgentCore() {
   private_node_handle_->param("shared_stats_topic", shared_stats_topic_name_, std::string(DEFAULT_SHARED_STATS_TOPIC));
   private_node_handle_->param("received_stats_topic", received_stats_topic_name_, std::string(DEFAULT_RECEIVED_STATS_TOPIC));
   private_node_handle_->param("target_stats_topic", target_stats_topic_name_, std::string(DEFAULT_TARGET_STATS_TOPIC));
-  private_node_handle_->param("sync_service", sync_service_name_, std::string(DEFAULT_SYNC_SERVICE));
   private_node_handle_->param("marker_topic", marker_topic_name_, std::string(DEFAULT_MARKER_TOPIC));
   private_node_handle_->param("marker_path_lifetime", marker_path_lifetime_, DEFAULT_MARKER_PATH_LIFETIME);
   private_node_handle_->param("enable_path", enable_path_, true);
-  private_node_handle_->param("fixed_frame", fixed_frame_, std::string(DEFAULT_FIXED_FRAME));
-  private_node_handle_->param("frame_base_name", frame_base_name_, std::string(DEFAULT_FRAME_BASE_NAME));
-  private_node_handle_->param("frame_virtual_suffix", frame_virtual_suffix_, std::string(DEFAULT_FRAME_VIRTUAL_SUFFIX));
+  private_node_handle_->param("sync_service", sync_service_name_, std::string(DEFAULT_SYNC_SERVICE));
   double sync_timeout;
-  private_node_handle_->param("sync_timeout", sync_timeout, (double)DEFAULT_SYNC_TIMEOUT);
+  private_node_handle_->param("sync_timeout", sync_timeout, (double)2*DEFAULT_SYNC_DELAY);
   sync_timeout_ = ros::Duration(sync_timeout);
+
+  private_node_handle_->param("frame_map", frame_map_, std::string(DEFAULT_FRAME_MAP));
+  private_node_handle_->param("frame_agent_prefix", frame_agent_prefix_, std::string(DEFAULT_FRAME_AGENT_PREFIX));
+  private_node_handle_->param("frame_virtual_suffix", frame_virtual_suffix_, std::string(DEFAULT_FRAME_VIRTUAL_SUFFIX));
 
   marker_publisher_ = node_handle_.advertise<visualization_msgs::Marker>(marker_topic_name_, topic_queue_length_);
   stats_publisher_ = node_handle_.advertise<agent_test::FormationStatisticsStamped>(shared_stats_topic_name_, topic_queue_length_);
@@ -113,13 +114,13 @@ void AgentCore::broadcastPath(const geometry_msgs::Pose &pose_new, const geometr
 void AgentCore::broadcastPose(const geometry_msgs::Pose &pose, const std::string &frame) {
   tf::Pose p;
   tf::poseMsgToTF(pose, p);
-  tf_broadcaster_.sendTransform(tf::StampedTransform(p, ros::Time::now(), fixed_frame_, frame));
+  tf_broadcaster_.sendTransform(tf::StampedTransform(p, ros::Time::now(), frame_map_, frame));
 }
 
 visualization_msgs::Marker AgentCore::addToMarkerPath(const geometry_msgs::Point &p_old, const geometry_msgs::Point &p_new,
                                                       const std::string &frame) {
   visualization_msgs::Marker marker;
-  marker.header.frame_id = fixed_frame_;
+  marker.header.frame_id = frame_map_;
   marker.header.stamp = ros::Time(0);
   marker.type = visualization_msgs::Marker::LINE_STRIP;
   marker.action = visualization_msgs::Marker::ADD;
@@ -412,10 +413,10 @@ void AgentCore::waitForSyncTime() {
   sync_client_.waitForExistence(sync_timeout_);
   agent_test::Sync srv;
   srv.request.agent_id = agent_id_;
-  srv.request.frame_base_name = frame_base_name_;
+  srv.request.frame_base_name = frame_agent_prefix_;
   if (sync_client_.call(srv)) {
     agent_id_ = srv.response.new_id;  // always update, even if it does not change
-    agent_frame_ = frame_base_name_ + std::to_string(agent_id_);
+    agent_frame_ = frame_agent_prefix_ + std::to_string(agent_id_);
     agent_virtual_frame_ = agent_frame_ + frame_virtual_suffix_;
 
     std::stringstream s;
