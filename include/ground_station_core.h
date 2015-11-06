@@ -50,6 +50,7 @@
 #define DEFAULT_SHARED_STATS_TOPIC "shared_stats"
 #define DEFAULT_RECEIVED_STATS_TOPIC "received_stats"
 #define DEFAULT_TARGET_STATS_TOPIC "target_stats"
+#define DEFAULT_MATLAB_POSES_TOPIC "matlab_poses"
 #define DEFAULT_SYNC_SERVICE "sync_agent"
 #define DEFAULT_MARKER_TOPIC "visualization_marker"
 #define DEFAULT_GROUND_STATION_FRAME "ground_station"
@@ -87,6 +88,7 @@ class GroundStationCore {
   ros::Publisher stats_publisher_;
   ros::Publisher marker_publisher_;
   ros::Subscriber stats_subscriber_;
+  ros::Subscriber matlab_poses_subscriber_;
   ros::Timer algorithm_timer_;
   ros::ServiceServer sync_server_;
   tf::TransformListener tf_listener_;
@@ -106,6 +108,7 @@ class GroundStationCore {
   std::string shared_stats_topic_name_;
   std::string received_stats_topic_name_;
   std::string target_stats_topic_name_;
+  std::string matlab_poses_topic_name_;
   std::string sync_service_name_;
   std::string marker_topic_name_;
   std::string ground_station_frame_;
@@ -166,6 +169,8 @@ class GroundStationCore {
 
   void computeEffectiveEllipse(const std::string &frame_suffix);
   agent_test::FormationStatistics computeStatsFromPoses(const std::vector<geometry_msgs::Pose> &poses);
+
+  void matlabPosesCallback(const geometry_msgs::Pose &pose);
 };
 
 #endif
