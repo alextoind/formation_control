@@ -56,6 +56,8 @@
 #define DEFAULT_GROUND_STATION_FRAME "ground_station"
 #define DEFAULT_FIXED_FRAME "map"
 #define DEFAULT_TARGET_FRAME "target_stats_ellipse"
+#define DEFAULT_FRAME_BASE_NAME "agent_"
+#define DEFAULT_FRAME_VIRTUAL_SUFFIX "_virtual"
 #define DEFAULT_NUMBER_OF_AGENTS 1
 #define DEFAULT_MARKER_DIST_MIN 0
 #define DEFAULT_MARKER_DIST_MAX 0.5
@@ -114,6 +116,8 @@ class GroundStationCore {
   std::string ground_station_frame_;
   std::string fixed_frame_;
   std::string target_frame_;
+  std::string frame_base_name_;
+  std::string frame_virtual_suffix_;
 
   agent_test::FormationStatisticsStamped target_statistics_;
   std::vector<agent_test::FormationStatisticsStamped> shared_statistics_grouped_;
@@ -130,45 +134,45 @@ class GroundStationCore {
   void sharedStatsCallback(const agent_test::FormationStatisticsStamped &shared);
   bool syncAgentCallback(agent_test::Sync::Request &request, agent_test::Sync::Response &response);
 
-  void waitForSync();
+  void waitForSync() const;
 
-  bool checkCollision(const int &id);
-  int extractFirstID();
+  bool checkCollision(const int &id) const;
+  int extractFirstID() const;
 
-  agent_test::FormationStatistics statsVectorPhysicsToMsg(const std::vector<double> &vector);
-  agent_test::FormationStatistics statsVectorToMsg(const std::vector<double> &vector);
+  agent_test::FormationStatistics statsVectorPhysicsToMsg(const std::vector<double> &vector) const;
+  agent_test::FormationStatistics statsVectorToMsg(const std::vector<double> &vector) const;
   agent_test::FormationStatisticsStamped statsVectorToMsg(const std::string &frame, const int &id,
-                                                          const std::vector <double> &vector);
+                                                          const std::vector <double> &vector) const;
 
   tf::Pose statsToPhysics(const agent_test::FormationStatistics &stats, double &a_x, double &a_y);
   tf::Pose statsToPhysics(const agent_test::FormationStatistics &stats, double &a_x, double &a_y, const double &theta_old);
-  agent_test::FormationStatistics physicsToStats(const geometry_msgs::Pose &pose, const double &a_x, const double &a_y);
-  void thetaCorrection(double &theta, const double &theta_old);
+  agent_test::FormationStatistics physicsToStats(const geometry_msgs::Pose &pose, const double &a_x, const double &a_y) const;
+  void thetaCorrection(double &theta, const double &theta_old) const;
 
   double computeA(const double &diameter) const;
   double computeDiameter(const double &a) const;
   void updateSpanningEllipse(const agent_test::FormationStatisticsStamped &msg);
   visualization_msgs::Marker makeEllipse(const double &diameter_x, const double &diameter_y, const std::string &frame,
-                                         const int &id);
+                                         const int &id) const;
 
   void interactiveMarkerInitialization();
   void interactiveMarkerCallback(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback);
   void interactiveMarkerGuidance(const geometry_msgs::Pose &target, geometry_msgs::Pose &current);
 
-  visualization_msgs::Marker makeBox(const double &scale);
-  void makeBoxControl(visualization_msgs::InteractiveMarker &interactive_marker);
+  visualization_msgs::Marker makeBox(const double &scale) const;
+  void makeBoxControl(visualization_msgs::InteractiveMarker &interactive_marker) const;
   void makeInteractiveMarkerAxis(const geometry_msgs::Pose &pose, const std::string &axis);
   void makeInteractiveMarkerPose(const geometry_msgs::Pose &pose);
 
   void updateTarget(const agent_test::FormationStatistics &target);
   void updateTargetStats(const agent_test::FormationStatistics &target);
 
-  double saturation(const double &value, const double &min, const double &max);
+  double saturation(const double &value, const double &min, const double &max) const;
 
-  void console(const std::string &caller_name, std::stringstream &message, const int &log_level);
+  void console(const std::string &caller_name, std::stringstream &message, const int &log_level) const;
 
   void computeEffectiveEllipse(const std::string &frame_suffix);
-  agent_test::FormationStatistics computeStatsFromPoses(const std::vector<geometry_msgs::Pose> &poses);
+  agent_test::FormationStatistics computeStatsFromPoses(const std::vector<geometry_msgs::Pose> &poses) const;
 
   void matlabPosesCallback(const geometry_msgs::Pose &pose);
 };

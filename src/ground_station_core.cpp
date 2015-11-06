@@ -29,6 +29,8 @@ GroundStationCore::GroundStationCore() {
   private_node_handle_->param("ground_station_frame", ground_station_frame_, std::string(DEFAULT_GROUND_STATION_FRAME));
   private_node_handle_->param("fixed_frame", fixed_frame_, std::string(DEFAULT_FIXED_FRAME));
   private_node_handle_->param("target_frame", target_frame_, std::string(DEFAULT_TARGET_FRAME));
+  private_node_handle_->param("frame_base_name", frame_base_name_, std::string(DEFAULT_FRAME_BASE_NAME));
+  private_node_handle_->param("frame_virtual_suffix", frame_virtual_suffix_, std::string(DEFAULT_FRAME_VIRTUAL_SUFFIX));
   private_node_handle_->param("number_of_agents", number_of_agents_, DEFAULT_NUMBER_OF_AGENTS);
   private_node_handle_->param("marker_dist_min", marker_dist_min_, (double)DEFAULT_MARKER_DIST_MIN);
   private_node_handle_->param("marker_dist_max", marker_dist_max_, (double)DEFAULT_MARKER_DIST_MAX);
@@ -87,10 +89,10 @@ void GroundStationCore::algorithmCallback(const ros::TimerEvent &timer_event) {
   console(__func__, s, DEBUG);
 
   computeEffectiveEllipse("");
-  computeEffectiveEllipse("_virtual");
+  computeEffectiveEllipse(frame_virtual_suffix_);
 }
 
-bool GroundStationCore::checkCollision(const int &id) {
+bool GroundStationCore::checkCollision(const int &id) const {
   return std::find(std::begin(connected_agents_), std::end(connected_agents_), id) != std::end(connected_agents_);
 }
 
@@ -105,7 +107,7 @@ double GroundStationCore::computeDiameter(const double &a) const {
 void GroundStationCore::computeEffectiveEllipse(const std::string &frame_suffix) {
   std::vector<geometry_msgs::Pose> agent_poses;
   for (auto const &id : connected_agents_) {
-    std::string frame = "agent_" + std::to_string(id) + frame_suffix;
+    std::string frame = frame_base_name_ + std::to_string(id) + frame_suffix;
     if (tf_listener_.canTransform(fixed_frame_, frame, ros::Time(0))) {
       tf::StampedTransform pose_tf;
       geometry_msgs::Pose pose_msg;
@@ -122,7 +124,7 @@ void GroundStationCore::computeEffectiveEllipse(const std::string &frame_suffix)
   updateSpanningEllipse(effective_statistics);
 }
 
-agent_test::FormationStatistics GroundStationCore::computeStatsFromPoses(const std::vector<geometry_msgs::Pose> &poses) {
+agent_test::FormationStatistics GroundStationCore::computeStatsFromPoses(const std::vector<geometry_msgs::Pose> &poses) const {
   agent_test::FormationStatistics stats;
 
   for (auto const &pose : poses) {
@@ -136,7 +138,7 @@ agent_test::FormationStatistics GroundStationCore::computeStatsFromPoses(const s
   return stats;
 }
 
-void GroundStationCore::console(const std::string &caller_name, std::stringstream &message, const int &log_level) {
+void GroundStationCore::console(const std::string &caller_name, std::stringstream &message, const int &log_level) const {
   std::stringstream s;
   s << "[GroundStationCore::" << caller_name << "]  " << message.str();
 
@@ -158,7 +160,7 @@ void GroundStationCore::console(const std::string &caller_name, std::stringstrea
   message.str(std::string());
 }
 
-int GroundStationCore::extractFirstID() {
+int GroundStationCore::extractFirstID() const {
   for (int i=1; i<=number_of_agents_; i++){
     if (!checkCollision(i)) {
       return i;
@@ -242,7 +244,7 @@ void GroundStationCore::interactiveMarkerInitialization() {
   makeInteractiveMarkerAxis(pose, "y");
 }
 
-visualization_msgs::Marker GroundStationCore::makeBox(const double &scale) {
+visualization_msgs::Marker GroundStationCore::makeBox(const double &scale) const {
   visualization_msgs::Marker marker;
 
   marker.type = visualization_msgs::Marker::CUBE;
@@ -257,7 +259,7 @@ visualization_msgs::Marker GroundStationCore::makeBox(const double &scale) {
   return marker;
 }
 
-void GroundStationCore::makeBoxControl(visualization_msgs::InteractiveMarker &interactive_marker) {
+void GroundStationCore::makeBoxControl(visualization_msgs::InteractiveMarker &interactive_marker) const {
   visualization_msgs::InteractiveMarkerControl control;
   control.always_visible = true;
   control.markers.push_back(makeBox(interactive_marker.scale));
@@ -267,7 +269,7 @@ void GroundStationCore::makeBoxControl(visualization_msgs::InteractiveMarker &in
 
 // TODO use params for namespaces and frames
 visualization_msgs::Marker GroundStationCore::makeEllipse(const double &diameter_x, const double &diameter_y,
-                                                          const std::string &frame, const int &id) {
+                                                          const std::string &frame, const int &id) const {
   visualization_msgs::Marker marker;
 
   marker.header.frame_id = frame;
@@ -291,14 +293,14 @@ visualization_msgs::Marker GroundStationCore::makeEllipse(const double &diameter
     marker.color.b = 0.5;
   }
   else if (frame == "effective_stats_virtual_ellipse") {
-    marker.ns = "effective_spanning_virtual_ellipse";
+    marker.ns = "effective_virtual_spanning_ellipse";
     marker.color.a = 0.1;
     marker.color.r = 0.5;
     marker.color.g = 0.5;
     marker.color.b = 0.5;
   }
   else {
-    marker.ns = "agent_spanning_ellipse";
+    marker.ns = frame_base_name_ + "spanning_ellipse";
     marker.color.a = 0.25;
     marker.color.r = 0.0;
     marker.color.g = 0.5;
@@ -380,17 +382,18 @@ void GroundStationCore::matlabPosesCallback(const geometry_msgs::Pose &pose) {
   tf::Pose p;
   tf::poseMsgToTF(pose, p);
 
-  std::string frame = "agent_0";  // TODO param
-  if (pose.position.z != 0) {
-    frame += "_virtual";
-    p.getOrigin().setZ(0);
+  // agent_id is hidden in the meaningless z value (z = id*2)
+  std::string frame = frame_base_name_ + std::to_string((int)pose.position.z / 2);
+  if (((int)pose.position.z % 2) != 0) {
+    frame += frame_virtual_suffix_;
   }
+  p.getOrigin().setZ(0);
 
   tf_broadcaster_.sendTransform(tf::StampedTransform(p, ros::Time::now(), fixed_frame_, frame));
 }
 
 agent_test::FormationStatistics GroundStationCore::physicsToStats(const geometry_msgs::Pose &pose, const double &a_x,
-                                                                  const double &a_y) {
+                                                                  const double &a_y) const {
   double roll, pitch, yaw;
   tf::Quaternion q;
   tf::quaternionMsgToTF(pose.orientation, q);
@@ -413,14 +416,14 @@ agent_test::FormationStatistics GroundStationCore::physicsToStats(const geometry
   return stats;
 }
 
-double GroundStationCore::saturation(const double &value, const double &min, const double &max) {
+double GroundStationCore::saturation(const double &value, const double &min, const double &max) const {
   return std::min(std::max(value, min), max);
 }
 
 void GroundStationCore::sharedStatsCallback(const agent_test::FormationStatisticsStamped &shared) {
   agent_test::FormationStatisticsStamped msg = shared;
   if (msg.header.frame_id == "") {  // agent from MATLAB
-    msg.header.frame_id = "agent_" + std::to_string(msg.agent_id) + "_virtual";
+    msg.header.frame_id = frame_base_name_ + std::to_string(msg.agent_id) + frame_virtual_suffix_;
   }
 
   bool updated = false;
@@ -474,7 +477,7 @@ tf::Pose GroundStationCore::statsToPhysics(const agent_test::FormationStatistics
   return pose;
 }
 
-agent_test::FormationStatistics GroundStationCore::statsVectorPhysicsToMsg(const std::vector<double> &vector) {
+agent_test::FormationStatistics GroundStationCore::statsVectorPhysicsToMsg(const std::vector<double> &vector) const {
   geometry_msgs::Pose pose_msg;
   tf::Pose pose_tf;
   pose_tf.setOrigin(tf::Vector3(vector.at(0), vector.at(1), 0));
@@ -484,7 +487,7 @@ agent_test::FormationStatistics GroundStationCore::statsVectorPhysicsToMsg(const
   return physicsToStats(pose_msg, computeA(vector.at(3)), computeA(vector.at(4)));
 }
 
-agent_test::FormationStatistics GroundStationCore::statsVectorToMsg(const std::vector<double> &vector) {
+agent_test::FormationStatistics GroundStationCore::statsVectorToMsg(const std::vector<double> &vector) const {
   agent_test::FormationStatistics msg;
   if (vector.size() != 5) {
     std::stringstream s;
@@ -502,7 +505,7 @@ agent_test::FormationStatistics GroundStationCore::statsVectorToMsg(const std::v
 }
 
 agent_test::FormationStatisticsStamped GroundStationCore::statsVectorToMsg(const std::string &frame, const int &id,
-                                                                           const std::vector<double> &vector) {
+                                                                           const std::vector<double> &vector) const {
   agent_test::FormationStatisticsStamped msg;
   msg.header.stamp = ros::Time::now();
   msg.header.frame_id = frame;
@@ -525,7 +528,7 @@ bool GroundStationCore::syncAgentCallback(agent_test::Sync::Request &request, ag
   return true;
 }
 
-void GroundStationCore::thetaCorrection(double &theta, const double &theta_old) {
+void GroundStationCore::thetaCorrection(double &theta, const double &theta_old) const {
   std::vector<double> thetas;
   std::vector<double> increments = {0, M_PI_2, M_PI, M_PI + M_PI_2};
   for (auto const i : increments) {
@@ -575,7 +578,7 @@ void GroundStationCore::updateTargetStats(const agent_test::FormationStatistics 
   target_stats_publisher_.publish(target_statistics_);
 }
 
-void GroundStationCore::waitForSync() {
+void GroundStationCore::waitForSync() const {
   while (sync_time_.isZero()) {
     ros::Duration(0.1).sleep();
   }

@@ -186,7 +186,7 @@ void AgentCore::consensus() {
   stats_publisher_.publish(msg);
 }
 
-void AgentCore::console(const std::string &caller_name, std::stringstream &message, const int &log_level) {
+void AgentCore::console(const std::string &caller_name, std::stringstream &message, const int &log_level) const {
   std::stringstream s;
   s << "[AgentCore::" << caller_name << "::Agent_" << agent_id_ << "]  " << message.str();
 
@@ -273,14 +273,14 @@ void AgentCore::dynamics() {
   broadcastPath(pose_, pose_old, agent_frame_);
 }
 
-Eigen::Vector3d AgentCore::getRPY(const geometry_msgs::Quaternion &quat) {
+Eigen::Vector3d AgentCore::getRPY(const geometry_msgs::Quaternion &quat) const {
   Eigen::Quaterniond eigen_quat;
   tf::quaternionMsgToEigen(quat, eigen_quat);
   Eigen::Vector3d rpy = eigen_quat.normalized().matrix().eulerAngles(0, 1, 2);
   return rpy;
 }
 
-double AgentCore::getTheta(const geometry_msgs::Quaternion &quat) {
+double AgentCore::getTheta(const geometry_msgs::Quaternion &quat) const {
   Eigen::Vector3d rpy = getRPY(quat);
   return rpy(2);
 }
@@ -314,11 +314,11 @@ void AgentCore::guidance() {
   console(__func__, s, DEBUG_VVVV);
 }
 
-void AgentCore::floor(double &d, const int &precision) {
+void AgentCore::floor(double &d, const int &precision) const {
   d = std::floor(d*std::pow(10, precision)) / std::pow(10, precision);
 }
 
-double AgentCore::integrator(const double &out_old, const double &in_old, const double &in_new, const double &k) {
+double AgentCore::integrator(const double &out_old, const double &in_old, const double &in_new, const double &k) const {
   return out_old + k*sample_time_*(in_old + in_new)/2;
 }
 
@@ -345,11 +345,11 @@ void AgentCore::receivedStatsCallback(const agent_test::FormationStatisticsArray
   console(__func__, s, DEBUG_VVVV);
 }
 
-double AgentCore::saturation(const double &value, const double &min, const double &max) {
+double AgentCore::saturation(const double &value, const double &min, const double &max) const {
   return std::min(std::max(value, min), max);
 }
 
-void AgentCore::setTheta(geometry_msgs::Quaternion &quat, const double &theta) {
+void AgentCore::setTheta(geometry_msgs::Quaternion &quat, const double &theta) const {
   Eigen::Vector3d rpy = getRPY(quat);
   Eigen::Quaterniond eigen_quat = Eigen::AngleAxisd(rpy(0), Eigen::Vector3d::UnitX())
                                   * Eigen::AngleAxisd(rpy(1), Eigen::Vector3d::UnitY())
@@ -361,7 +361,7 @@ void AgentCore::setTheta(geometry_msgs::Quaternion &quat, const double &theta) {
   console(__func__, s, DEBUG_VVVV);
 }
 
-Eigen::MatrixXd AgentCore::statsMsgToMatrix(const std::vector<agent_test::FormationStatistics> &msg) {
+Eigen::MatrixXd AgentCore::statsMsgToMatrix(const std::vector<agent_test::FormationStatistics> &msg) const {
   Eigen::MatrixXd matrix = Eigen::MatrixXd::Zero(msg.size(), number_of_stats_);
   for (int i=0; i<msg.size(); i++) {
     matrix.row(i) = statsMsgToVector(msg.at(i));
@@ -369,13 +369,13 @@ Eigen::MatrixXd AgentCore::statsMsgToMatrix(const std::vector<agent_test::Format
   return matrix;
 }
 
-Eigen::VectorXd AgentCore::statsMsgToVector(const agent_test::FormationStatistics &msg) {
+Eigen::VectorXd AgentCore::statsMsgToVector(const agent_test::FormationStatistics &msg) const {
   Eigen::VectorXd vector(number_of_stats_);
   vector << msg.m_x, msg.m_y, msg.m_xx, msg.m_xy, msg.m_yy;
   return vector;
 }
 
-agent_test::FormationStatistics AgentCore::statsVectorToMsg(const Eigen::VectorXd &vector) {
+agent_test::FormationStatistics AgentCore::statsVectorToMsg(const Eigen::VectorXd &vector) const {
   agent_test::FormationStatistics msg;
   if (vector.size() != number_of_stats_) {
     std::stringstream s;
@@ -392,7 +392,7 @@ agent_test::FormationStatistics AgentCore::statsVectorToMsg(const Eigen::VectorX
   return msg;
 }
 
-agent_test::FormationStatistics AgentCore::statsVectorToMsg(const std::vector<double> &vector) {
+agent_test::FormationStatistics AgentCore::statsVectorToMsg(const std::vector<double> &vector) const {
   std::vector<double> v = vector;  // can't use 'data()' method on const std::vector
   return statsVectorToMsg(Eigen::Map<Eigen::VectorXd>(v.data(), v.size()));
 }

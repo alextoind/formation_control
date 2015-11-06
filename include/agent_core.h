@@ -81,7 +81,6 @@
 
 // TODO: choose properly which variables has to be ROS params (for both classes)
 // TODO: extract common functions in an external library
-// TODO: make functions const
 
 
 class AgentCore {
@@ -168,18 +167,18 @@ class AgentCore {
   void control();
   void guidance();
 
-  Eigen::VectorXd statsMsgToVector(const agent_test::FormationStatistics &msg);
-  Eigen::MatrixXd statsMsgToMatrix(const std::vector <agent_test::FormationStatistics> &msg);
-  agent_test::FormationStatistics statsVectorToMsg(const Eigen::VectorXd &vector);
-  agent_test::FormationStatistics statsVectorToMsg(const std::vector<double> &vector);
+  Eigen::VectorXd statsMsgToVector(const agent_test::FormationStatistics &msg) const;
+  Eigen::MatrixXd statsMsgToMatrix(const std::vector <agent_test::FormationStatistics> &msg) const;
+  agent_test::FormationStatistics statsVectorToMsg(const Eigen::VectorXd &vector) const;
+  agent_test::FormationStatistics statsVectorToMsg(const std::vector<double> &vector) const;
 
-  void floor(double &d, const int &precision);
-  double integrator(const double &out_old, const double &in_old, const double &in_new, const double &k);
-  double saturation(const double &value, const double &min, const double &max);
+  void floor(double &d, const int &precision) const;
+  double integrator(const double &out_old, const double &in_old, const double &in_new, const double &k) const;
+  double saturation(const double &value, const double &min, const double &max) const;
 
-  Eigen::Vector3d getRPY(const geometry_msgs::Quaternion &quat);
-  double getTheta(const geometry_msgs::Quaternion &quat);
-  void setTheta(geometry_msgs::Quaternion &quat, const double &theta);
+  Eigen::Vector3d getRPY(const geometry_msgs::Quaternion &quat) const;
+  double getTheta(const geometry_msgs::Quaternion &quat) const;
+  void setTheta(geometry_msgs::Quaternion &quat, const double &theta) const;
 
   void waitForSyncTime();
 
@@ -188,7 +187,7 @@ class AgentCore {
   visualization_msgs::Marker addToMarkerPath(const geometry_msgs::Point &p_old, const geometry_msgs::Point &p_new,
                                              const std::string &frame);
 
-  void console(const std::string &caller_name, std::stringstream &message, const int &log_level);
+  void console(const std::string &caller_name, std::stringstream &message, const int &log_level) const;
 };
 
 #endif
