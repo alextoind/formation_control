@@ -92,7 +92,7 @@ AgentCore::AgentCore() {
   waitForSyncTime();
 
   algorithm_timer_ = private_node_handle_->createTimer(ros::Duration(sample_time_), &AgentCore::algorithmCallback, this);
-};
+}
 
 AgentCore::~AgentCore() {
   delete private_node_handle_;

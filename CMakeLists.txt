@@ -77,8 +77,21 @@ add_executable(${BIN_GROUND_STATION}
 )
 target_link_libraries(${BIN_GROUND_STATION}
   ${catkin_LIBRARIES}
-  ${Eigen_LIBRARIES}
 )
 add_dependencies(${BIN_GROUND_STATION}
+  ${catkin_EXPORTED_TARGETS}
+)
+
+# Packet Manager:
+set(BIN_PACKET_MANAGER packet_manager_test)
+
+add_executable(${BIN_PACKET_MANAGER}
+  src/packet_manager_test.cpp
+  src/packet_manager_core.cpp
+)
+target_link_libraries(${BIN_PACKET_MANAGER}
+  ${catkin_LIBRARIES}
+)
+add_dependencies(${BIN_PACKET_MANAGER}
   ${catkin_EXPORTED_TARGETS}
 )
