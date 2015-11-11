@@ -36,6 +36,7 @@ class GroundStationCore {
   ros::Publisher stats_publisher_;
   ros::Publisher marker_publisher_;
   ros::Subscriber stats_subscriber_;
+  ros::Subscriber agent_poses_subscriber_;
   ros::Subscriber matlab_poses_subscriber_;
   ros::Timer algorithm_timer_;
   ros::ServiceServer sync_server_;
@@ -56,6 +57,7 @@ class GroundStationCore {
   std::string shared_stats_topic_name_;
   std::string received_stats_topic_name_;
   std::string target_stats_topic_name_;
+  std::string agent_poses_topic_name_;
   std::string matlab_poses_topic_name_;
   std::string marker_topic_name_;
   std::string sync_service_name_;
@@ -83,6 +85,8 @@ class GroundStationCore {
   void algorithmCallback(const ros::TimerEvent &timer_event);
   void sharedStatsCallback(const agent_test::FormationStatisticsStamped &shared);
   bool syncAgentCallback(agent_test::Sync::Request &request, agent_test::Sync::Response &response);
+  void agentPosesCallback(const geometry_msgs::PoseStamped &pose);
+  void matlabPosesCallback(const geometry_msgs::Pose &pose);
 
   void waitForSync() const;
 
@@ -123,8 +127,6 @@ class GroundStationCore {
 
   void computeEffectiveEllipse(const std::string &frame_suffix);
   agent_test::FormationStatistics computeStatsFromPoses(const std::vector<geometry_msgs::Pose> &poses) const;
-
-  void matlabPosesCallback(const geometry_msgs::Pose &pose);
 };
 
 #endif

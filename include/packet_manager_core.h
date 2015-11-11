@@ -33,6 +33,8 @@ extern "C" {
 #define DEFAULT_SERIAL_TIMEOUT 5.0  // expressed in seconds
 #define DEFAULT_BUFFER_LENGTH 256  // number of bytes per packet
 
+// TODO: add sender and receiver to let the Packet Manager on the ST address packets to the proper real agent
+
 
 class PacketManagerCore {
  public:

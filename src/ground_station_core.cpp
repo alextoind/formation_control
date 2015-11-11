@@ -24,6 +24,7 @@ GroundStationCore::GroundStationCore() {
   private_node_handle_->param("shared_stats_topic", shared_stats_topic_name_, std::string(DEFAULT_SHARED_STATS_TOPIC));
   private_node_handle_->param("received_stats_topic", received_stats_topic_name_, std::string(DEFAULT_RECEIVED_STATS_TOPIC));
   private_node_handle_->param("target_stats_topic", target_stats_topic_name_, std::string(DEFAULT_TARGET_STATS_TOPIC));
+  private_node_handle_->param("agent_poses_topic", agent_poses_topic_name_, std::string(DEFAULT_AGENT_POSES_TOPIC));
   private_node_handle_->param("matlab_poses_topic", matlab_poses_topic_name_, std::string(DEFAULT_MATLAB_POSES_TOPIC));
   private_node_handle_->param("marker_topic", marker_topic_name_, std::string(DEFAULT_MARKER_TOPIC));
   private_node_handle_->param("sync_service", sync_service_name_, std::string(DEFAULT_SYNC_SERVICE));
@@ -63,6 +64,7 @@ GroundStationCore::GroundStationCore() {
   target_stats_publisher_ = node_handle_.advertise<agent_test::FormationStatisticsStamped>(target_stats_topic_name_, topic_queue_length_);
   stats_publisher_ = node_handle_.advertise<agent_test::FormationStatisticsArray>(received_stats_topic_name_, topic_queue_length_);
   stats_subscriber_ = node_handle_.subscribe(shared_stats_topic_name_, number_of_agents_, &GroundStationCore::sharedStatsCallback, this);
+  agent_poses_subscriber_ = node_handle_.subscribe(agent_poses_topic_name_, 2, &GroundStationCore::agentPosesCallback, this);
   matlab_poses_subscriber_ = node_handle_.subscribe(matlab_poses_topic_name_, 2, &GroundStationCore::matlabPosesCallback, this);
   sync_server_ = node_handle_.advertiseService(sync_service_name_, &GroundStationCore::syncAgentCallback, this);
   interactive_marker_server_ = new interactive_markers::InteractiveMarkerServer("interactive_markers");
@@ -80,6 +82,12 @@ GroundStationCore::GroundStationCore() {
 GroundStationCore::~GroundStationCore() {
   delete interactive_marker_server_;
   delete private_node_handle_;
+}
+
+void GroundStationCore::agentPosesCallback(const geometry_msgs::PoseStamped &pose_msg) {
+  tf::Pose pose_tf;
+  tf::poseMsgToTF(pose_msg.pose, pose_tf);
+  tf_broadcaster_.sendTransform(tf::StampedTransform(pose_tf, pose_msg.header.stamp, frame_map_, pose_msg.header.frame_id));
 }
 
 void GroundStationCore::algorithmCallback(const ros::TimerEvent &timer_event) {
@@ -384,17 +392,19 @@ void GroundStationCore::makeInteractiveMarkerPose(const geometry_msgs::Pose &pos
 }
 
 void GroundStationCore::matlabPosesCallback(const geometry_msgs::Pose &pose) {
-  tf::Pose p;
-  tf::poseMsgToTF(pose, p);
-
   // agent_id is hidden in the meaningless z value (z = id*2)
   std::string frame = frame_agent_prefix_ + std::to_string((int)pose.position.z / 2);
   if (((int)pose.position.z % 2) != 0) {
     frame += frame_virtual_suffix_;
   }
-  p.getOrigin().setZ(0);
 
-  tf_broadcaster_.sendTransform(tf::StampedTransform(p, ros::Time::now(), frame_map_, frame));
+  geometry_msgs::PoseStamped pose_msg;
+  pose_msg.header.frame_id = frame;
+  pose_msg.header.stamp = ros::Time::now();
+  pose_msg.pose = pose;
+  pose_msg.pose.position.z = 0;  // it has to be 0 (2D environment)
+
+  agentPosesCallback(pose_msg);
 }
 
 agent_test::FormationStatistics GroundStationCore::physicsToStats(const geometry_msgs::Pose &pose, const double &a_x,
