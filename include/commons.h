@@ -21,6 +21,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <queue>
 #include <map>
 #include <random>
 #include <algorithm>
@@ -56,6 +57,7 @@
 #define DEFAULT_SHARED_STATS_TOPIC "shared_stats"
 #define DEFAULT_RECEIVED_STATS_TOPIC "received_stats"
 #define DEFAULT_TARGET_STATS_TOPIC "target_stats"
+#define DEFAULT_AGENT_POSES_TOPIC "agent_poses"
 #define DEFAULT_MATLAB_POSES_TOPIC "matlab_poses"
 #define DEFAULT_MARKER_TOPIC "visualization_marker"
 #define DEFAULT_SYNC_SERVICE "sync_agent"

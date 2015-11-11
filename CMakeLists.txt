@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   tf
   interactive_markers
+  serial
 )
 find_package(Eigen REQUIRED)
 
@@ -36,6 +37,7 @@ generate_messages(
 )
 
 include_directories(include
+  include/packet_manager
   ${catkin_INCLUDE_DIRS}
   ${Eigen_INCLUDE_DIRS}
 )
@@ -88,6 +90,8 @@ set(BIN_PACKET_MANAGER packet_manager_test)
 add_executable(${BIN_PACKET_MANAGER}
   src/packet_manager_test.cpp
   src/packet_manager_core.cpp
+  src/packet_manager/packet_manager.c
+  src/packet_manager/packet_agent.c
 )
 target_link_libraries(${BIN_PACKET_MANAGER}
   ${catkin_LIBRARIES}

@@ -67,6 +67,8 @@ GroundStationCore::GroundStationCore() {
   sync_server_ = node_handle_.advertiseService(sync_service_name_, &GroundStationCore::syncAgentCallback, this);
   interactive_marker_server_ = new interactive_markers::InteractiveMarkerServer("interactive_markers");
 
+  // TODO: agentPosesCallback(PoseStamped) implementation and redirect the matlab one on this with proper params
+
   waitForSync();
   algorithm_timer_ = private_node_handle_->createTimer(ros::Duration(sample_time_), &GroundStationCore::algorithmCallback, this);
   number_of_agents_ = connected_agents_.size();
