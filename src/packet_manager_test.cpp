@@ -17,7 +17,7 @@ int main(int argc, char **argv) {
   ros::init(argc, argv, "packet_manager_test");
 
   // activates the asynchronous multi-thread spinner
-  ros::AsyncSpinner spinner(3);  // TODO: check the max number of threads
+  ros::AsyncSpinner spinner(3);
   spinner.start();
 
   PacketManagerCore *packet_manager = new PacketManagerCore();

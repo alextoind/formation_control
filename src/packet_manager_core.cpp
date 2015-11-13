@@ -13,6 +13,10 @@
 
 #include "packet_manager_core.h"
 
+// packet_queue_ is filled by the newPacket function, which has to be passed to a C file and thus cannot be a method
+// of a class; for this reason, and only for this, the queue has to be a "global variable".
+void *g_packet_queue_pointer;
+
 PacketManagerCore::PacketManagerCore() {
   // handles server private parameters (private names are protected from accidental name collisions)
   private_node_handle_ = new ros::NodeHandle("~");
@@ -60,11 +64,12 @@ PacketManagerCore::PacketManagerCore() {
   serial_->flush();  // flushes both read and write streams
 
   // packet manager primitives (see ./src/packet_manager.c)
-//  pm_init(std::bind(&PacketManagerCore::newPacket, this, std::placeholders::_1), PacketManagerCore::errorDeserialize, PacketManagerCore::errorSerialize);
-//  pm_register_packet(PCK_TARGET, target_statistics_serialize, target_statistics_deserialize, target_statistics_reset);
-//  pm_register_packet(PCK_RECEIVED, received_statistics_serialize, received_statistics_deserialize, received_statistics_reset);
+  pm_init(newPacket, errorDeserialize, errorSerialize);
+  pm_register_packet(PCK_TARGET, target_statistics_serialize, target_statistics_deserialize, target_statistics_reset);
+  pm_register_packet(PCK_RECEIVED, received_statistics_serialize, received_statistics_deserialize, received_statistics_reset);
   pm_register_packet(PCK_AGENT, agent_serialize, agent_deserialize, agent_reset);
-
+  // actually packet_queue_ is a global variable
+  g_packet_queue_pointer = &packet_queue_;
 
   stats_publisher_ = node_handle_.advertise<agent_test::FormationStatisticsStamped>(shared_stats_topic_name_, topic_queue_length_);
   stats_subscriber_ = node_handle_.subscribe(received_stats_topic_name_, topic_queue_length_, &PacketManagerCore::receivedStatsCallback, this);
@@ -125,21 +130,21 @@ void PacketManagerCore::console(const std::string &caller_name, std::stringstrea
   message.str(std::string());
 }
 
-void PacketManagerCore::errorDeserialize(unsigned char header, unsigned char errno) {
+void errorDeserialize(unsigned char header, unsigned char errno) {
 //  if (header == 1 && errno == 0) {
 //
 //  }
 }
 
-void PacketManagerCore::errorSerialize(unsigned char header, unsigned char errno) {
+void errorSerialize(unsigned char header, unsigned char errno) {
 //  if (header == 1 && errno == 0) {
 //
 //  }
 }
 
-void PacketManagerCore::newPacket(unsigned char header) {
+void newPacket(unsigned char header, unsigned char sender, unsigned char receiver) {
   if (header == PCK_AGENT) {
-    packet_queue_.push(agent_data);
+    static_cast<std::queue<Agent>*>(g_packet_queue_pointer)->push(agent_data);
   }
 }
 
@@ -196,7 +201,6 @@ void PacketManagerCore::receivedStatsCallback(const agent_test::FormationStatist
   received_statistics_data.stats_sum.m_xy = 0;
   received_statistics_data.stats_sum.m_yy = 0;
 
-  // TODO: modify the MATLAB scheme to fit this packet
   received_statistics_data.number_of_agents = (i_uint8)received.vector.size();
   for (auto const &data : received.vector) {
     received_statistics_data.stats_sum.m_x += (i_float)data.stats.m_x;
@@ -207,7 +211,7 @@ void PacketManagerCore::receivedStatsCallback(const agent_test::FormationStatist
   }
 
   // sends data to serial interface
-  serialSendPacket(PCK_RECEIVED);
+  serialSendPacket(PCK_RECEIVED, PM_BASESTATION, PM_BROADCAST);
 
   std::stringstream s;
   s << "Received statistics from " << received.vector.size()  << " other agents.";
@@ -232,14 +236,14 @@ void PacketManagerCore::serialReceivePacket() {
   } while (bytes_read != 0);
 }
 
-void PacketManagerCore::serialSendPacket(unsigned char header) {
+void PacketManagerCore::serialSendPacket(unsigned char header, unsigned char sender, unsigned char receiver) {
   char sent_status;
   short ch;
   uint8_t buffer[buffer_length_];
   uint32_t id = 0;
 
   do {
-    ch = _pm_send_byte(header, &sent_status);
+    ch = _pm_send_byte(header, sender, receiver, &sent_status);
     if (ch != -200) {  // hard coded (see ./src/packet_manager/packet_manager.c)
       buffer[id++] = (uint8_t)ch;
     }
@@ -276,7 +280,7 @@ void PacketManagerCore::targetStatsCallback(const agent_test::FormationStatistic
   target_statistics_data.stats.m_yy = (i_float)target.stats.m_yy;
 
   // sends data to serial interface
-  serialSendPacket(PCK_TARGET);
+  serialSendPacket(PCK_TARGET, PM_BASESTATION, PM_BROADCAST);
 
   std::stringstream s;
   s << "Target statistics has been changed.";

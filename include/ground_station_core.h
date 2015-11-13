@@ -21,7 +21,7 @@
 #define DEFAULT_MARKER_STEER_MIN -0.52
 #define DEFAULT_MARKER_STEER_MAX 0.52
 
-// TODO: add critical failure handler
+// TODO (future work): add critical failure handler
 
 
 class GroundStationCore {

@@ -8,7 +8,7 @@ typedef unsigned char (*SerializeFcn)(char* done);
 typedef char (*DeserializeFcn)(unsigned char ch);
 typedef void (*ResetFcn)(void);
 
-typedef void (*NewPacketFcn)(unsigned char header);
+typedef void (*NewPacketFcn)(unsigned char header, unsigned char sender, unsigned char receiver);
 typedef void (*ErrorFcn)(unsigned char header, unsigned char errno);
 
 void pm_init(NewPacketFcn _newPacketFcn, ErrorFcn _errorDeserializeFcn, ErrorFcn _errorSerializeFcn);

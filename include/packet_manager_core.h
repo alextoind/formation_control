@@ -23,17 +23,22 @@ extern "C" {
   #include "packet_manager.h"
 
   // forward declaration of 'private' functions defined in ./src/packet_manager.c
-  short _pm_send_byte(unsigned char id, char *sent);
+  short _pm_send_byte(unsigned char id, unsigned char sender, unsigned char receiver, char *sent);
   void _pm_process_byte(unsigned char ch);
 }
+void errorDeserialize(unsigned char header, unsigned char errno);
+void errorSerialize(unsigned char header, unsigned char errno);
+void newPacket(unsigned char header, unsigned char sender, unsigned char receiver);
 
 // default values for ROS params (if not specified by the user)
 #define DEFAULT_SERIAL_PORT "/dev/ttyACM0"
-#define DEFAULT_SERIAL_BAUDRATE 115200  // 256000
+#define DEFAULT_SERIAL_BAUDRATE 115200
 #define DEFAULT_SERIAL_TIMEOUT 5.0  // expressed in seconds
 #define DEFAULT_BUFFER_LENGTH 256  // number of bytes per packet
 
-// TODO: add sender and receiver to let the Packet Manager on the ST address packets to the proper real agent
+// these parameters are just a hypothesis (see the final version of ./include/packet_manager/packet_manager.h)
+#define PM_BASESTATION 0  // id of the base station (agent ids from 1 to 9)
+#define PM_BROADCAST 0  // id for broadcast communication
 
 
 class PacketManagerCore {
@@ -75,11 +80,8 @@ class PacketManagerCore {
   void receivedStatsCallback(const agent_test::FormationStatisticsArray &received);
   void algorithmCallback(const ros::TimerEvent &timer_event);
 
-  void errorDeserialize(unsigned char header, unsigned char errno);
-  void errorSerialize(unsigned char header, unsigned char errno);
-  void newPacket(unsigned char header);
   void serialReceivePacket();
-  void serialSendPacket(unsigned char header);
+  void serialSendPacket(unsigned char header, unsigned char sender, unsigned char receiver);
 
   void console(const std::string &caller_name, std::stringstream &message, const int &log_level) const;
 

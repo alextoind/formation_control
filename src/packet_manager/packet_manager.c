@@ -99,7 +99,7 @@ void pm_register_packet(unsigned char _header, SerializeFcn _serialize, Deserial
     pmgr.packets[pmgr.registered_packets++] = pdesc;
 }
 
-short _pm_send_byte(unsigned char id, char* sent)
+short _pm_send_byte(unsigned char id, unsigned char sender, unsigned char receiver, char* sent)
 {
     unsigned char data;
 	char done;
@@ -138,7 +138,17 @@ short _pm_send_byte(unsigned char id, char* sent)
             return -200;
         }                
     }
-    else if (send_state == 3) {
+	else if (send_state == 3) {
+		send_state++;
+		send_cs_calculated += sender;
+		return sender;
+	}
+	else if (send_state == 4) {
+		send_state++;
+		send_cs_calculated += receiver;
+		return receiver;
+	}
+    else if (send_state == 5) {
         // send the packet payload
         if (pmgr.packets[send_idx].serialize)
         {
@@ -166,7 +176,7 @@ short _pm_send_byte(unsigned char id, char* sent)
         }
         return data;       
     }
-    else if (send_state == 4) {
+    else if (send_state == 6) {
 		unsigned char csbyte = (unsigned char)(send_cs_calculated & 0xFF);
 		send_cs_calculated = 0;
         send_state = 0;
@@ -181,54 +191,87 @@ void _pm_process_byte(unsigned char ch)
     static char need_cs = 0;
 	static short current_idx = -1;
     static unsigned long recv_cs_calculated = 0;
-    
+	// flag che indicano se sono stati letti il mittente e il destinatario
+	static unsigned char flag_sender=1;
+	static unsigned char flag_receiver=1;
+	// valore di default del sender e del receiver è 255 (convenzione)
+	static unsigned char sender = 255;
+	static unsigned char receiver = 255;
+	
     if (current_idx == -1)
     {
         current_idx = header_seq_recognizer(ch);
     }
     else
     {
-        if (need_cs == 0)
-        {
-            recv_cs_calculated += ch;
-            
-            if (pmgr.packets[current_idx].deserialize)
-            {
-                if (pmgr.packets[current_idx].deserialize(ch))
-                {
-                    need_cs = 1;
-                }
-            }
-            else
-            {
-                // error_deserialize_callback not registered
-                if (error_deserialize_callback)
-                {
-#ifdef USE_ERR_CALLBACK                    
-                    error_deserialize_callback(pmgr.packets[current_idx].packet_header, 0);
-#endif
-                }
-            }
-        }
-        else
-        {
-            if (verify_checksum(recv_cs_calculated, ch) == 1)
-            {
-                if (new_packet_callback)
-                    new_packet_callback(pmgr.packets[current_idx].packet_header);
-            }
-            else
-            {
-                if (error_deserialize_callback)
-                {
-#ifdef USE_ERR_CALLBACK                    
-                    error_deserialize_callback(pmgr.packets[current_idx].packet_header, 0);
-#endif
-                }
-            }
-            need_cs = 0;
-            current_idx = -1;
-            recv_cs_calculated = 0;
-        }
+		//leggo il mittente
+		if (flag_sender)
+		{
+			sender=ch;
+			recv_cs_calculated += ch;
+			flag_sender=0;
+		}
+		//leggo il destinatario
+		else if (flag_receiver)
+		{
+			receiver=ch;
+			recv_cs_calculated += ch;
+			flag_receiver=0;
+		}
+		//leggo il payload
+		else
+		{
+
+			if (need_cs == 0)
+			{
+				recv_cs_calculated += ch;
+				
+				if (pmgr.packets[current_idx].deserialize)
+				{
+					// se la seguente condizione è vera, significa che è finito il payload
+					if (pmgr.packets[current_idx].deserialize(ch))
+					{
+						need_cs = 1;
+					}
+				}
+				else
+				{
+					// error_deserialize_callback not registered
+					if (error_deserialize_callback)
+					{
+						#ifdef USE_ERR_CALLBACK                    
+						error_deserialize_callback(pmgr.packets[current_idx].packet_header, 0);
+						#endif
+					}
+				}
+			}
+			else
+			{
+				//verifico il checksum
+				if (verify_checksum(recv_cs_calculated, ch) == 1)
+				{	
+					// se il checksum è verificato allora chiamo la new_packet
+					if (new_packet_callback)
+						new_packet_callback(pmgr.packets[current_idx].packet_header, sender, receiver);
+				}
+				else
+				{
+					if (error_deserialize_callback)
+					{
+						#ifdef USE_ERR_CALLBACK                    
+						error_deserialize_callback(pmgr.packets[current_idx].packet_header, 0);
+						#endif
+					}
+				}
+				//ripristino valori di default
+				need_cs = 0;
+				current_idx = -1;
+				recv_cs_calculated = 0;
+				flag_sender=1;
+				flag_receiver=1;
+				sender=255;
+				receiver=255;
+			}
+		}
     }
 }
