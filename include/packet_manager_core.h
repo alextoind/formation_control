@@ -36,9 +36,9 @@ void newPacket(unsigned char header, unsigned char sender, unsigned char receive
 #define DEFAULT_SERIAL_TIMEOUT 5.0  // expressed in seconds
 #define DEFAULT_BUFFER_LENGTH 256  // number of bytes per packet
 
-// these parameters are just a hypothesis (see the final version of ./include/packet_manager/packet_manager.h)
+// this parameter is just a hypothesis (see the final version of ./include/packet_manager/packet_manager.h)
 #define PM_BASESTATION 0  // id of the base station (agent ids from 1 to 9)
-#define PM_BROADCAST 0  // id for broadcast communication
+#define PM_BROADCAST 255
 
 
 class PacketManagerCore {
@@ -57,7 +57,6 @@ class PacketManagerCore {
 
   int topic_queue_length_;
   std::string shared_stats_topic_name_;
-  std::string received_stats_topic_name_;
   std::string target_stats_topic_name_;
   std::string agent_poses_topic_name_;
 
@@ -71,17 +70,18 @@ class PacketManagerCore {
 
   std::queue<Agent> packet_queue_;
   ros::Time time_last_packet_;
+  std::vector<uint8_t> real_agents_;
 
   double sample_time_;
   int verbosity_level_;
 
 
-  void targetStatsCallback(const agent_test::FormationStatisticsStamped &target);
-  void receivedStatsCallback(const agent_test::FormationStatisticsArray &received);
+  void targetStatsCallback(const formation_control::FormationStatisticsStamped &target);
+  void receivedStatsCallback(const formation_control::FormationStatisticsStamped &received);
   void algorithmCallback(const ros::TimerEvent &timer_event);
 
   void serialReceivePacket();
-  void serialSendPacket(unsigned char header, unsigned char sender, unsigned char receiver);
+  void serialSendPacket(const uint8_t &header, const uint8_t &sender, const uint8_t &receiver);
 
   void console(const std::string &caller_name, std::stringstream &message, const int &log_level) const;
 

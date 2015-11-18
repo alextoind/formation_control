@@ -1,16 +1,16 @@
 #include "packet_agent.h"
 
-struct TargetStatistics target_statistics_data;
-struct ReceivedStatistics received_statistics_data;
+struct Statistics target_statistics_data;
+struct Statistics received_statistics_data;
 struct Agent agent_data;
 
 
 unsigned char target_statistics_serialize(char* done) {
-  GENERIC_SERIALIZE(TargetStatistics, target_statistics_data);
+  GENERIC_SERIALIZE(Statistics, target_statistics_data);
 }
 
 char target_statistics_deserialize(unsigned char ch) {
-  GENERIC_DESERIALIZE(TargetStatistics, target_statistics_data);
+  GENERIC_DESERIALIZE(Statistics, target_statistics_data);
 }
 
 void target_statistics_reset(void) {
@@ -19,11 +19,11 @@ void target_statistics_reset(void) {
 
 
 unsigned char received_statistics_serialize(char* done) {
-  GENERIC_SERIALIZE(ReceivedStatistics, received_statistics_data);
+  GENERIC_SERIALIZE(Statistics, received_statistics_data);
 }
 
 char received_statistics_deserialize(unsigned char ch) {
-  GENERIC_DESERIALIZE(ReceivedStatistics, received_statistics_data);
+  GENERIC_DESERIALIZE(Statistics, received_statistics_data);
 }
 
 void received_statistics_reset(void) {

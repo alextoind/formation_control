@@ -11,21 +11,21 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ground_station_core.h"
+#include "visualization_core.h"
 
 int main(int argc, char **argv) {
   std::cout << LICENSE_INFO << std::flush;
 
-  ros::init(argc, argv, "ground_station_test");
+  ros::init(argc, argv, "visualization");
 
   // activates the asynchronous multi-thread spinner
   ros::AsyncSpinner spinner(2);
   spinner.start();
 
-  GroundStationCore *ground_station = new GroundStationCore();
+  VisualizationCore *visualization = new VisualizationCore();
 
   ros::waitForShutdown();
 
-  delete ground_station;
+  delete visualization;
   return 0;
 }

@@ -25,6 +25,7 @@
 #include <map>
 #include <random>
 #include <algorithm>
+#include <mutex>
 // ROS libraries
 #include <ros/ros.h>
 #include <ros/time.h>
@@ -39,23 +40,22 @@
 #include <tf/transform_datatypes.h>
 #include <visualization_msgs/Marker.h>
 #include <interactive_markers/interactive_marker_server.h>
-// auto-generated from ./msg and ./srv directories libraries
-#include <agent_test/FormationStatistics.h>
-#include <agent_test/FormationStatisticsStamped.h>
-#include <agent_test/FormationStatisticsArray.h>
-#include <agent_test/Sync.h>
+// auto-generated from ./msg directory libraries
+#include <formation_control/FormationStatistics.h>
+#include <formation_control/FormationStatisticsStamped.h>
 
 // license info to be displayed at the beginning
 #define LICENSE_INFO "\n*\n* Copyright (C) 2015 Alessandro Tondo\n* This program comes with ABSOLUTELY NO WARRANTY.\n* This is free software, and you are welcome to\n* redistribute it under GNU GPL v3.0 conditions.\n* (for details see <http://www.gnu.org/licenses/>).\n*\n\n"
 // default values for ROS params (if not specified by the user) for both AgentCore and GroundStationCore classes
 #define DEFAULT_SAMPLE_TIME 0.1  // expressed in seconds
+#define DEFAULT_SLOT_TDMA 0.01  // duration of each tdma slot (expressed in seconds)
 #define DEFAULT_NUMBER_OF_AGENTS 9
 #define DEFAULT_NUMBER_OF_STATS 5  // see FormationStatistics.msg (mx, my, mxx, mxy, myy)
 #define DEFAULT_NUMBER_OF_VELOCITIES 2  // virtual planar linear twist (virtual_x_dot, virutal_y_dot)
 #define DEFAULT_VERBOSITY_LEVEL 1
 #define DEFAULT_TOPIC_QUEUE_LENGTH 1
 #define DEFAULT_SHARED_STATS_TOPIC "shared_stats"
-#define DEFAULT_RECEIVED_STATS_TOPIC "received_stats"
+#define DEFAULT_RECEIVED_STATS_TOPIC "received_stats"  // TODO: code revision
 #define DEFAULT_TARGET_STATS_TOPIC "target_stats"
 #define DEFAULT_AGENT_POSES_TOPIC "agent_poses"
 #define DEFAULT_MATLAB_POSES_TOPIC "matlab_poses"

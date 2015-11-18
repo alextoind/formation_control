@@ -32,7 +32,6 @@ PacketManagerCore::PacketManagerCore() {
 
   private_node_handle_->param("topic_queue_length", topic_queue_length_, DEFAULT_TOPIC_QUEUE_LENGTH);
   private_node_handle_->param("shared_stats_topic", shared_stats_topic_name_, std::string(DEFAULT_SHARED_STATS_TOPIC));
-  private_node_handle_->param("received_stats_topic", received_stats_topic_name_, std::string(DEFAULT_RECEIVED_STATS_TOPIC));
   private_node_handle_->param("target_stats_topic", target_stats_topic_name_, std::string(DEFAULT_TARGET_STATS_TOPIC));
   private_node_handle_->param("agent_poses_topic", agent_poses_topic_name_, std::string(DEFAULT_AGENT_POSES_TOPIC));
 
@@ -71,8 +70,8 @@ PacketManagerCore::PacketManagerCore() {
   // actually packet_queue_ is a global variable
   g_packet_queue_pointer = &packet_queue_;
 
-  stats_publisher_ = node_handle_.advertise<agent_test::FormationStatisticsStamped>(shared_stats_topic_name_, topic_queue_length_);
-  stats_subscriber_ = node_handle_.subscribe(received_stats_topic_name_, topic_queue_length_, &PacketManagerCore::receivedStatsCallback, this);
+  stats_publisher_ = node_handle_.advertise<formation_control::FormationStatisticsStamped>(shared_stats_topic_name_, topic_queue_length_);
+  stats_subscriber_ = node_handle_.subscribe(shared_stats_topic_name_, topic_queue_length_, &PacketManagerCore::receivedStatsCallback, this);
   target_stats_subscriber_ = node_handle_.subscribe(target_stats_topic_name_, topic_queue_length_, &PacketManagerCore::targetStatsCallback, this);
   agent_poses_publisher_ = node_handle_.advertise<geometry_msgs::PoseStamped>(agent_poses_topic_name_, topic_queue_length_);
 
@@ -153,18 +152,22 @@ void PacketManagerCore::processPackets() {
   Agent packet = packet_queue_.front();
   packet_queue_.pop();
 
+  if (std::find(std::begin(real_agents_), std::end(real_agents_), (int)packet.agent_id) == std::end(real_agents_)) {
+    real_agents_.push_back((uint8_t)packet.agent_id);  // packet from a new real agent
+  }
+
   std::string agent_frame = frame_agent_prefix_ + std::to_string((int)packet.agent_id);
   std::string agent_frame_virtual = agent_frame + frame_virtual_suffix_;
 
-  agent_test::FormationStatisticsStamped msg_estimated_statistics;
+  formation_control::FormationStatisticsStamped msg_estimated_statistics;
   msg_estimated_statistics.agent_id = (int)packet.agent_id;
   msg_estimated_statistics.header.frame_id = agent_frame_virtual;
   msg_estimated_statistics.header.stamp = ros::Time::now();
-  msg_estimated_statistics.stats.m_x = (double)packet.stats.m_x;
-  msg_estimated_statistics.stats.m_y = (double)packet.stats.m_y;
-  msg_estimated_statistics.stats.m_xx = (double)packet.stats.m_xx;
-  msg_estimated_statistics.stats.m_xy = (double)packet.stats.m_xy;
-  msg_estimated_statistics.stats.m_yy = (double)packet.stats.m_yy;
+  msg_estimated_statistics.stats.m_x = (double)packet.m_x;
+  msg_estimated_statistics.stats.m_y = (double)packet.m_y;
+  msg_estimated_statistics.stats.m_xx = (double)packet.m_xx;
+  msg_estimated_statistics.stats.m_xy = (double)packet.m_xy;
+  msg_estimated_statistics.stats.m_yy = (double)packet.m_yy;
 
   geometry_msgs::PoseStamped  msg_pose;
   msg_pose.header.frame_id = agent_frame;
@@ -183,8 +186,8 @@ void PacketManagerCore::processPackets() {
   std::stringstream s;
   s << "Received data from " << agent_frame << ".";
   console(__func__, s, INFO);
-  s << agent_frame << " estimated statistics (" << (double)packet.stats.m_x << ", " << (double)packet.stats.m_y << ", "
-    << (double)packet.stats.m_xx << ", " << (double)packet.stats.m_xy << ", " << (double)packet.stats.m_yy << ").";
+  s << agent_frame << " estimated statistics (" << (double)packet.m_x << ", " << (double)packet.m_y << ", "
+    << (double)packet.m_xx << ", " << (double)packet.m_xy << ", " << (double)packet.m_yy << ").";
   console(__func__, s, DEBUG_VVV);
   s << agent_frame << " pose (" << (double)packet.pose_x << ", " << (double)packet.pose_y << ", "
                                 << (double)packet.pose_theta << ").";
@@ -194,28 +197,26 @@ void PacketManagerCore::processPackets() {
   console(__func__, s, DEBUG_VVV);
 }
 
-void PacketManagerCore::receivedStatsCallback(const agent_test::FormationStatisticsArray &received) {
-  received_statistics_data.stats_sum.m_x = 0;
-  received_statistics_data.stats_sum.m_y = 0;
-  received_statistics_data.stats_sum.m_xx = 0;
-  received_statistics_data.stats_sum.m_xy = 0;
-  received_statistics_data.stats_sum.m_yy = 0;
+void PacketManagerCore::receivedStatsCallback(const formation_control::FormationStatisticsStamped &received) {
+  received_statistics_data.m_x = (i_float)received.stats.m_x;
+  received_statistics_data.m_y = (i_float)received.stats.m_y;
+  received_statistics_data.m_xx = (i_float)received.stats.m_xx;
+  received_statistics_data.m_xy = (i_float)received.stats.m_xy;
+  received_statistics_data.m_yy = (i_float)received.stats.m_yy;
 
-  received_statistics_data.number_of_agents = (i_uint8)received.vector.size();
-  for (auto const &data : received.vector) {
-    received_statistics_data.stats_sum.m_x += (i_float)data.stats.m_x;
-    received_statistics_data.stats_sum.m_y += (i_float)data.stats.m_y;
-    received_statistics_data.stats_sum.m_xx += (i_float)data.stats.m_xx;
-    received_statistics_data.stats_sum.m_xy += (i_float)data.stats.m_xy;
-    received_statistics_data.stats_sum.m_yy += (i_float)data.stats.m_yy;
+  // forward received statistics to all the connected real agents
+  for (auto const &id : real_agents_) {
+    if (id == (uint8_t)received.agent_id) {
+      break;  // no needs to send the packet to its owner (it computes this estimation few milliseconds ago)
+    }
+
+    // sends data to serial interface (sender and receiver are specified for a correct routing on the base station)
+    serialSendPacket(PCK_RECEIVED, (uint8_t)received.agent_id, id);  // can't use PM_BROADCAST in this case
+
+    std::stringstream s;
+    s << "Received statistics from " << received.header.frame_id  << " forwarded to agent_" << id << "_virtual (real).";
+    console(__func__, s, DEBUG);
   }
-
-  // sends data to serial interface
-  serialSendPacket(PCK_RECEIVED, PM_BASESTATION, PM_BROADCAST);
-
-  std::stringstream s;
-  s << "Received statistics from " << received.vector.size()  << " other agents.";
-  console(__func__, s, DEBUG);
 }
 
 void PacketManagerCore::serialReceivePacket() {
@@ -236,7 +237,7 @@ void PacketManagerCore::serialReceivePacket() {
   } while (bytes_read != 0);
 }
 
-void PacketManagerCore::serialSendPacket(unsigned char header, unsigned char sender, unsigned char receiver) {
+void PacketManagerCore::serialSendPacket(const uint8_t &header, const uint8_t &sender, const uint8_t &receiver) {
   char sent_status;
   short ch;
   uint8_t buffer[buffer_length_];
@@ -272,19 +273,19 @@ geometry_msgs::Pose PacketManagerCore::setPose(const double &x, const double &y,
   return pose_msg;
 }
 
-void PacketManagerCore::targetStatsCallback(const agent_test::FormationStatisticsStamped &target) {
-  target_statistics_data.stats.m_x = (i_float)target.stats.m_x;
-  target_statistics_data.stats.m_y = (i_float)target.stats.m_y;
-  target_statistics_data.stats.m_xx = (i_float)target.stats.m_xx;
-  target_statistics_data.stats.m_xy = (i_float)target.stats.m_xy;
-  target_statistics_data.stats.m_yy = (i_float)target.stats.m_yy;
+void PacketManagerCore::targetStatsCallback(const formation_control::FormationStatisticsStamped &target) {
+  target_statistics_data.m_x = (i_float)target.stats.m_x;
+  target_statistics_data.m_y = (i_float)target.stats.m_y;
+  target_statistics_data.m_xx = (i_float)target.stats.m_xx;
+  target_statistics_data.m_xy = (i_float)target.stats.m_xy;
+  target_statistics_data.m_yy = (i_float)target.stats.m_yy;
 
-  // sends data to serial interface
-  serialSendPacket(PCK_TARGET, PM_BASESTATION, PM_BROADCAST);
+  // sends data to serial interface (sender and receiver are specified for a correct routing on the base station)
+  serialSendPacket(PCK_RECEIVED, PM_BASESTATION, PM_BROADCAST);  // forward target statistics to all the real agents
 
   std::stringstream s;
-  s << "Target statistics has been changed.";
-  console(__func__, s, INFO);
+  s << "Target statistics forwarded to all the real agents.";
+  console(__func__, s, DEBUG);
   s << "New target statistics (" << target.stats.m_x << ", " << target.stats.m_y << ", " << target.stats.m_xx << ", "
     << target.stats.m_xy << ", " << target.stats.m_yy << ").";
   console(__func__, s, DEBUG_VVVV);

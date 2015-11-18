@@ -1,7 +1,7 @@
 <launch>
   <arg name="agent_id" default="0"/>
 
-  <node pkg="agent_test" type="agent_test" name="$(anon agent)" output="screen" cwd="ROS_HOME">
+  <node pkg="formation_control" type="agent" name="$(anon agent)" output="screen" cwd="ROS_HOME">
     <param name="agent_id" type="int" value="$(arg agent_id)" />
   </node>
 </launch>

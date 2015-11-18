@@ -13,15 +13,6 @@ struct Statistics {
   i_float m_yy;
 };
 
-struct TargetStatistics {
-  struct Statistics stats;
-};
-
-struct ReceivedStatistics {
-  i_uint8 number_of_agents;
-  struct Statistics stats_sum;
-};
-
 unsigned char target_statistics_serialize(char* done);
 char target_statistics_deserialize(unsigned char ch);
 void target_statistics_reset(void);
@@ -34,7 +25,11 @@ struct Agent {
   i_uint8 agent_id;
 
   // estimated statistics
-  struct Statistics stats;
+  i_float m_x;
+  i_float m_y;
+  i_float m_xx;
+  i_float m_xy;
+  i_float m_yy;
 
   // virtual agent pose
   i_float pose_x_virtual;
@@ -52,8 +47,8 @@ char agent_deserialize(unsigned char ch);
 void agent_reset(void);
 
 
-extern struct TargetStatistics target_statistics_data;  // output packet (from ROS's point of view)
-extern struct ReceivedStatistics received_statistics_data;  // output packet (from ROS's point of view)
+extern struct Statistics target_statistics_data;  // output packet (from ROS's point of view)
+extern struct Statistics received_statistics_data;  // output packet (from ROS's point of view)
 extern struct Agent agent_data;  // input packet (from ROS's point of view)
 
 #endif

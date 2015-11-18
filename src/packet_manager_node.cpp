@@ -11,19 +11,19 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "agent_core.h"
+#include "packet_manager_core.h"
 
 int main(int argc, char **argv) {
-  ros::init(argc, argv, "agent_test");
+  ros::init(argc, argv, "packet_manager");
 
   // activates the asynchronous multi-thread spinner
   ros::AsyncSpinner spinner(3);
   spinner.start();
 
-  AgentCore *agent = new AgentCore();
+  PacketManagerCore *packet_manager = new PacketManagerCore();
 
   ros::waitForShutdown();
 
-  delete agent;
+  delete packet_manager;
   return 0;
 }

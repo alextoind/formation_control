@@ -1,8 +1,8 @@
 <package format="2">
-  <name>agent_test</name>  <!--TODO: change package name-->
-  <version>0.1.1</version>
+  <name>formation_control</name>
+  <version>0.2.1</version>
   <description>
-    Agent Test
+    Distributed Estimation and Control of Swarm Formation Statistics with Simulated and Real Agents.
   </description>
   <author>Alessandro Tondo</author>
   <maintainer email="tondo.codes+ros@gmail.com">Alessandro Tondo</maintainer>

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(agent_test)
+project(formation_control)
 set(CMAKE_CXX_FLAGS "-std=c++11")
 
 find_package(catkin REQUIRED COMPONENTS
@@ -21,13 +21,6 @@ add_message_files(
   FILES
     FormationStatistics.msg
     FormationStatisticsStamped.msg
-    FormationStatisticsArray.msg
-)
-
-add_service_files(
-  DIRECTORY srv
-  FILES
-    Sync.srv
 )
 
 generate_messages(
@@ -56,39 +49,39 @@ catkin_package(
 )
 
 # Agent:
-set(BIN_AGENT_TEST agent_test)
+set(BIN_AGENT agent)
 
-add_executable(${BIN_AGENT_TEST}
-  src/agent_test.cpp
+add_executable(${BIN_AGENT}
+  src/agent_node.cpp
   src/agent_core.cpp
 )
-target_link_libraries(${BIN_AGENT_TEST}
+target_link_libraries(${BIN_AGENT}
   ${catkin_LIBRARIES}
   ${Eigen_LIBRARIES}
 )
-add_dependencies(${BIN_AGENT_TEST}
+add_dependencies(${BIN_AGENT}
   ${catkin_EXPORTED_TARGETS}
 )
 
-# Ground Station:
-set(BIN_GROUND_STATION ground_station_test)
+# Visualization:
+set(BIN_VISUALIZATION visualization)
 
-add_executable(${BIN_GROUND_STATION}
-  src/ground_station_test.cpp
-  src/ground_station_core.cpp
+add_executable(${BIN_VISUALIZATION}
+  src/visualization_node.cpp
+  src/visualization_core.cpp
 )
-target_link_libraries(${BIN_GROUND_STATION}
+target_link_libraries(${BIN_VISUALIZATION}
   ${catkin_LIBRARIES}
 )
-add_dependencies(${BIN_GROUND_STATION}
+add_dependencies(${BIN_VISUALIZATION}
   ${catkin_EXPORTED_TARGETS}
 )
 
 # Packet Manager:
-set(BIN_PACKET_MANAGER packet_manager_test)
+set(BIN_PACKET_MANAGER packet_manager)
 
 add_executable(${BIN_PACKET_MANAGER}
-  src/packet_manager_test.cpp
+  src/packet_manager_node.cpp
   src/packet_manager_core.cpp
   src/packet_manager/packet_manager.c
   src/packet_manager/packet_agent.c

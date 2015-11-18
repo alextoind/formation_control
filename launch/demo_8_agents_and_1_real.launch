@@ -1,14 +1,14 @@
 <launch>
-  <env name="ROSCONSOLE_CONFIG_FILE" value="$(find agent_test)/config/rosconsole_debug_enabled.conf"/>
+  <env name="ROSCONSOLE_CONFIG_FILE" value="$(find formation_control)/config/rosconsole_debug_enabled.conf"/>
 
   <node pkg="tf" type="static_transform_publisher" name="fixed_frame_pub" args="0.0 0.0 0.0 0.0 0.0 0.0 map map_origin 100" />
 
-  <node pkg="agent_test" type="ground_station_test" name="ground_station" output="screen" cwd="ROS_HOME">
+  <node pkg="formation_control" type="visualization" name="visualization" output="screen" cwd="ROS_HOME">
     <param name="number_of_agents" type="int" value="9" />
-    <rosparam command="load" file="$(find agent_test)/config/ground_station_initialization.yaml" />
+    <rosparam command="load" file="$(find formation_control)/config/visualization_initialization.yaml" />
   </node>
 
-  <node pkg="agent_test" type="packet_manager_test" name="packet_manager" output="screen" cwd="ROS_HOME">
+  <node pkg="formation_control" type="packet_manager" name="packet_manager" output="screen" cwd="ROS_HOME">
     <param name="serial_port" type="string" value="/dev/ttyACM0" />
     <param name="serial_baudrate" type="int" value="115200" />
   </node>
@@ -16,74 +16,74 @@
   <!-- agent 1 is the real vehicle -->
 
   <arg name="id_2" value="2"/>
-  <node pkg="agent_test" type="agent_test" name="agent_$(arg id_2)" output="screen" cwd="ROS_HOME">
+  <node pkg="formation_control" type="agent" name="agent_$(arg id_2)" output="screen" cwd="ROS_HOME">
     <param name="x" type="double" value="0.0" />
     <param name="y" type="double" value="-0.5" />
     <param name="theta" type="double" value="0.0" />
     <param name="agent_id" type="int" value="$(arg id_2)" />
-    <rosparam command="load" file="$(find agent_test)/config/agent_initialization.yaml" />
+    <rosparam command="load" file="$(find formation_control)/config/agent_initialization.yaml" />
   </node>
 
   <arg name="id_3" value="3"/>
-  <node pkg="agent_test" type="agent_test" name="agent_$(arg id_3)" output="screen" cwd="ROS_HOME">
+  <node pkg="formation_control" type="agent" name="agent_$(arg id_3)" output="screen" cwd="ROS_HOME">
     <param name="x" type="double" value="0.5" />
     <param name="y" type="double" value="-0.5" />
     <param name="theta" type="double" value="0.0" />
     <param name="agent_id" type="int" value="$(arg id_3)" />
-    <rosparam command="load" file="$(find agent_test)/config/agent_initialization.yaml" />
+    <rosparam command="load" file="$(find formation_control)/config/agent_initialization.yaml" />
   </node>
 
   <arg name="id_4" value="4"/>
-  <node pkg="agent_test" type="agent_test" name="agent_$(arg id_4)" output="screen" cwd="ROS_HOME">
+  <node pkg="formation_control" type="agent" name="agent_$(arg id_4)" output="screen" cwd="ROS_HOME">
     <param name="x" type="double" value="-0.5" />
     <param name="y" type="double" value="0.0" />
     <param name="theta" type="double" value="0.0" />
     <param name="agent_id" type="int" value="$(arg id_4)" />
-    <rosparam command="load" file="$(find agent_test)/config/agent_initialization.yaml" />
+    <rosparam command="load" file="$(find formation_control)/config/agent_initialization.yaml" />
   </node>
 
   <arg name="id_5" value="5"/>
-  <node pkg="agent_test" type="agent_test" name="agent_$(arg id_5)" output="screen" cwd="ROS_HOME">
+  <node pkg="formation_control" type="agent" name="agent_$(arg id_5)" output="screen" cwd="ROS_HOME">
     <param name="x" type="double" value="0.0" />
     <param name="y" type="double" value="0.0" />
     <param name="theta" type="double" value="0.0" />
     <param name="agent_id" type="int" value="$(arg id_5)" />
-    <rosparam command="load" file="$(find agent_test)/config/agent_initialization.yaml" />
+    <rosparam command="load" file="$(find formation_control)/config/agent_initialization.yaml" />
   </node>
 
   <arg name="id_6" value="6"/>
-  <node pkg="agent_test" type="agent_test" name="agent_$(arg id_6)" output="screen" cwd="ROS_HOME">
+  <node pkg="formation_control" type="agent" name="agent_$(arg id_6)" output="screen" cwd="ROS_HOME">
     <param name="x" type="double" value="0.5" />
     <param name="y" type="double" value="0.0" />
     <param name="theta" type="double" value="0.0" />
     <param name="agent_id" type="int" value="$(arg id_6)" />
-    <rosparam command="load" file="$(find agent_test)/config/agent_initialization.yaml" />
+    <rosparam command="load" file="$(find formation_control)/config/agent_initialization.yaml" />
   </node>
 
   <arg name="id_7" value="7"/>
-  <node pkg="agent_test" type="agent_test" name="agent_$(arg id_7)" output="screen" cwd="ROS_HOME">
+  <node pkg="formation_control" type="agent" name="agent_$(arg id_7)" output="screen" cwd="ROS_HOME">
     <param name="x" type="double" value="-0.5" />
     <param name="y" type="double" value="0.5" />
     <param name="theta" type="double" value="0.0" />
     <param name="agent_id" type="int" value="$(arg id_7)" />
-    <rosparam command="load" file="$(find agent_test)/config/agent_initialization.yaml" />
+    <rosparam command="load" file="$(find formation_control)/config/agent_initialization.yaml" />
   </node>
 
   <arg name="id_8" value="8"/>
-  <node pkg="agent_test" type="agent_test" name="agent_$(arg id_8)" output="screen" cwd="ROS_HOME">
+  <node pkg="formation_control" type="agent" name="agent_$(arg id_8)" output="screen" cwd="ROS_HOME">
     <param name="x" type="double" value="0.0" />
     <param name="y" type="double" value="0.5" />
     <param name="theta" type="double" value="0.0" />
     <param name="agent_id" type="int" value="$(arg id_8)" />
-    <rosparam command="load" file="$(find agent_test)/config/agent_initialization.yaml" />
+    <rosparam command="load" file="$(find formation_control)/config/agent_initialization.yaml" />
   </node>
 
   <arg name="id_9" value="9"/>
-  <node pkg="agent_test" type="agent_test" name="agent_$(arg id_9)" output="screen" cwd="ROS_HOME">
+  <node pkg="formation_control" type="agent" name="agent_$(arg id_9)" output="screen" cwd="ROS_HOME">
     <param name="x" type="double" value="0.5" />
     <param name="y" type="double" value="0.5" />
     <param name="theta" type="double" value="0.0" />
     <param name="agent_id" type="int" value="$(arg id_9)" />
-    <rosparam command="load" file="$(find agent_test)/config/agent_initialization.yaml" />
+    <rosparam command="load" file="$(find formation_control)/config/agent_initialization.yaml" />
   </node>
 </launch>
