@@ -1,6 +1,8 @@
 # Agent Test
 
-TODO
+From the terminal: `roslaunch formation_control demo_9_agents.launch`
+
+TODO: explain everything...
 
 Further improvements:
 

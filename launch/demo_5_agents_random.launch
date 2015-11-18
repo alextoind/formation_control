@@ -1,6 +1,8 @@
 <launch>
   <env name="ROSCONSOLE_CONFIG_FILE" value="$(find formation_control)/config/rosconsole_debug_enabled.conf"/>
 
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find formation_control)/config/config.rviz" output="screen"/>
+
   <node pkg="tf" type="static_transform_publisher" name="fixed_frame_pub" args="0.0 0.0 0.0 0.0 0.0 0.0 map map_origin 100" />
 
   <node pkg="formation_control" type="visualization" name="visualization" output="screen" cwd="ROS_HOME">
