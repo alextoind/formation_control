@@ -4,7 +4,6 @@ diag_elements_lambda: [0, 0, 0, 0, 0]
 diag_elements_b: [100, 100]
 
 velocity_virtual_threshold: 4.0
-los_distance_threshold: 4.0
 speed_min: 0.0
 speed_max: 4.0
 steer_min: -0.25

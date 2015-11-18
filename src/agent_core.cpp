@@ -24,7 +24,6 @@ AgentCore::AgentCore() {
   private_node_handle_->param("number_of_velocities", number_of_velocities_, DEFAULT_NUMBER_OF_VELOCITIES);
   private_node_handle_->param("verbosity_level", verbosity_level_, DEFAULT_VERBOSITY_LEVEL);
   private_node_handle_->param("velocity_virtual_threshold", velocity_virtual_threshold_, (double)DEFAULT_VELOCITY_VIRTUAL_THRESHOLD);
-  private_node_handle_->param("los_distance_threshold", los_distance_threshold_, (double)DEFAULT_LOS_DISTANCE_THRESHOLD);
   private_node_handle_->param("speed_min", speed_min_, (double)DEFAULT_SPEED_MIN);
   private_node_handle_->param("speed_max", speed_max_, (double)DEFAULT_SPEED_MAX);
   private_node_handle_->param("steer_min", steer_min_, (double)DEFAULT_STEER_MIN);

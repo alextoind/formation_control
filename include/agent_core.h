@@ -18,7 +18,6 @@
 // default values for ROS params (if not specified by the user)
 #define DEFAULT_AGENT_ID 0  // if not set by the user, the Ground Station will choose an unique value
 #define DEFAULT_VELOCITY_VIRTUAL_THRESHOLD 4.0  // expressed in meters/second
-#define DEFAULT_LOS_DISTANCE_THRESHOLD 4.0
 #define DEFAULT_SPEED_MIN 0.0  // expressed in meters/second
 #define DEFAULT_SPEED_MAX 4.0  // expressed in meters/second
 #define DEFAULT_STEER_MIN -0.25  // expressed in radians
@@ -83,7 +82,6 @@ class AgentCore {
   Eigen::MatrixXd jacob_phi_;
 
   double velocity_virtual_threshold_;
-  double los_distance_threshold_;
   double speed_min_;
   double speed_max_;
   double steer_min_;
