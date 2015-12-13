@@ -87,7 +87,7 @@ AgentCore::AgentCore() {
   marker_publisher_ = node_handle_.advertise<visualization_msgs::Marker>(marker_topic_name_, topic_queue_length_);
 
   waitForSlotTDMA(sample_time_);  // sync to the next sample time slot
-
+  // must be immediately after the waitForSlotTDMA method to ensure a satisfactory synchronization with TDMA protocol
   algorithm_timer_ = private_node_handle_->createTimer(ros::Duration(sample_time_), &AgentCore::algorithmCallback, this);
 }
 
@@ -180,14 +180,14 @@ void AgentCore::consensus() {
               pose_virtual_.position.y*twist_virtual_.linear.x + pose_virtual_.position.x*twist_virtual_.linear.y,
               2*pose_virtual_.position.y*twist_virtual_.linear.y;
 
-  double convergence_consensus_limit = 1.0/(x_j.rows() + 1);  // 1/deg_max >> (I - t*L) is primitive
+  double convergence_consensus_limit = 1.0/(x_j.rows() + 1);  // 1/deg_max >> (I - Ts*L) is primitive
   if (sample_time_ >= convergence_consensus_limit) {
     s << "The current sample time (" << sample_time_
       << ") does not guarantee the consensus convergence (upper bound: " << convergence_consensus_limit << ").";
     console(__func__, s, ERROR);
   }
 
-  // dynamic discrete consensus: x_k+1 = z_dot_k*S + (I - S*L)x_k = z_dot_k*S + x_k + S*sum_j(x_j_k - x_k)
+  // dynamic discrete consensus: x_k+1 = phi_k*Ts + (I - Ts*L)x_k = phi_k*Ts + x_k + Ts*sum_j(x_j_k - x_k)
   x += phi_dot_*sample_time_ + (x_j.rowwise() - x).colwise().sum()*sample_time_;
 
   estimated_statistics_ = statsVectorToMsg(x);
@@ -283,6 +283,10 @@ void AgentCore::dynamics() {
   broadcastPath(pose_, pose_old, agent_frame_);
 }
 
+void AgentCore::floor(double &d, const int &precision) const {
+  d = std::floor(d*std::pow(10, precision)) / std::pow(10, precision);
+}
+
 Eigen::Vector3d AgentCore::getRPY(const geometry_msgs::Quaternion &quat) const {
   Eigen::Quaterniond eigen_quat;
   tf::quaternionMsgToEigen(quat, eigen_quat);
@@ -316,10 +320,6 @@ void AgentCore::guidance() {
   console(__func__, s, DEBUG_VV);
   s << "LOS distance and angle (" << los_distance << ", " << los_angle << ").";
   console(__func__, s, DEBUG_VVVV);
-}
-
-void AgentCore::floor(double &d, const int &precision) const {
-  d = std::floor(d*std::pow(10, precision)) / std::pow(10, precision);
 }
 
 double AgentCore::integrator(const double &out_old, const double &in_old, const double &in_new, const double &k) const {
@@ -407,7 +407,7 @@ void AgentCore::targetStatsCallback(const formation_control::FormationStatistics
 
 void AgentCore::waitForSlotTDMA(const double &deadline) const{
   ros::Time slot;
-  // round to the next exact decisecond (hhmmss:x00) plus the proper deadline (agent dependent)
+  // rounds to the current exact decisecond (hhmmss:x00) plus the proper deadline (agent dependent)
   slot.fromSec(std::floor(ros::Time::now().toSec()*10)/10 + deadline);
 
   std::stringstream s;

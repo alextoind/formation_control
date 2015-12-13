@@ -14,7 +14,6 @@
 #ifndef GUARD_COMMONS_H
 #define GUARD_COMMONS_H
 
-// includes for both AgentCore and GroundStationCore classes
 // standard libraries
 #include <string>
 #include <iostream>
