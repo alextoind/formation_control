@@ -67,6 +67,7 @@ PacketManagerCore::PacketManagerCore() {
   pm_register_packet(PCK_TARGET, target_statistics_serialize, target_statistics_deserialize, target_statistics_reset);
   pm_register_packet(PCK_RECEIVED, received_statistics_serialize, received_statistics_deserialize, received_statistics_reset);
   pm_register_packet(PCK_AGENT, agent_serialize, agent_deserialize, agent_reset);
+  pm_register_packet(PCK_BS_TELEMETRY, bs_telemetry_serialize, bs_telemetry_deserialize, bs_telemetry_reset);  // debug
   // actually packet_queue_ is a global variable
   g_packet_queue_pointer = &packet_queue_;
 
@@ -144,6 +145,13 @@ void errorSerialize(unsigned char header, unsigned char errno) {
 void newPacket(unsigned char header, unsigned char sender, unsigned char receiver) {
   if (header == PCK_AGENT) {
     static_cast<std::queue<Agent>*>(g_packet_queue_pointer)->push(agent_data);
+  }
+
+  // this packet is retrieved only to verify that the communication with the bs is done properly
+  if (header == PCK_BS_TELEMETRY) {
+    ROS_INFO_STREAM("[PacketManagerCore::" << __func__ << "]  " << "Data from " << sender << " to " << receiver
+                    << " (ECEF pos x: " << (double)bs_telemetry_data.car_ecef_px
+                    << ", ECEF pos y: " << (double)bs_telemetry_data.car_ecef_py << ").");
   }
 }
 

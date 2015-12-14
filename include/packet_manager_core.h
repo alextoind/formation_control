@@ -19,6 +19,7 @@
 
 extern "C" {
   #include "packet_agent.h"
+  #include "packet_bs_telemetry.h"
   #include "packet_ids.h"
   #include "packet_manager.h"
 

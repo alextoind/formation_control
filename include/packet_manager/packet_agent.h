@@ -5,6 +5,7 @@
 #include "packet_manager.h"
 
 
+// 20 bytes (data 5*4) + 3 (header) + 1 (checksum) = 24 bytes (total)
 struct Statistics {
   i_float m_x;
   i_float m_y;
@@ -21,6 +22,8 @@ unsigned char received_statistics_serialize(char* done);
 char received_statistics_deserialize(unsigned char ch);
 void received_statistics_reset(void);
 
+
+// 45 bytes (data 11*4 + 1) + 3 (header) + 1 (checksum) = 49 bytes (total)
 struct Agent {
   i_uint8 agent_id;
 
