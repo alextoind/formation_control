@@ -85,7 +85,7 @@ add_executable(${BIN_PACKET_MANAGER}
   src/packet_manager_core.cpp
   src/packet_manager/packet_manager.c
   src/packet_manager/packet_agent.c
-  src/packet_manager/packet_bs_telemetry.c
+  src/packet_manager/packet_car_telemetry.c
 )
 target_link_libraries(${BIN_PACKET_MANAGER}
   ${catkin_LIBRARIES}

@@ -19,7 +19,7 @@
 
 extern "C" {
   #include "packet_agent.h"
-  #include "packet_bs_telemetry.h"
+  #include "packet_car_telemetry.h"
   #include "packet_ids.h"
   #include "packet_manager.h"
 
@@ -27,13 +27,14 @@ extern "C" {
   short _pm_send_byte(unsigned char id, unsigned char sender, unsigned char receiver, char *sent);
   void _pm_process_byte(unsigned char ch);
 }
+
 void errorDeserialize(unsigned char header, unsigned char errno);
 void errorSerialize(unsigned char header, unsigned char errno);
 void newPacket(unsigned char header, unsigned char sender, unsigned char receiver);
 
 // default values for ROS params (if not specified by the user)
-#define DEFAULT_SERIAL_PORT "/dev/ttyACM0"
-#define DEFAULT_SERIAL_BAUDRATE 115200
+#define DEFAULT_SERIAL_PORT "/dev/ttyUSB0"
+#define DEFAULT_SERIAL_BAUDRATE 57600 // check the code of the ST, it could be 115200
 #define DEFAULT_SERIAL_TIMEOUT 5.0  // expressed in seconds
 #define DEFAULT_BUFFER_LENGTH 256  // number of bytes per packet
 

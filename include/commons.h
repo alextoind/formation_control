@@ -54,7 +54,6 @@
 #define DEFAULT_VERBOSITY_LEVEL 1
 #define DEFAULT_TOPIC_QUEUE_LENGTH 1
 #define DEFAULT_SHARED_STATS_TOPIC "shared_stats"
-#define DEFAULT_RECEIVED_STATS_TOPIC "received_stats"  // TODO: code revision
 #define DEFAULT_TARGET_STATS_TOPIC "target_stats"
 #define DEFAULT_AGENT_POSES_TOPIC "agent_poses"
 #define DEFAULT_MATLAB_POSES_TOPIC "matlab_poses"
