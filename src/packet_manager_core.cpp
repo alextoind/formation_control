@@ -154,7 +154,6 @@ void newPacket(unsigned char header, unsigned char sender, unsigned char receive
                     << " (ECEF pos x: " << (double)car_telemetry_data.ecef_px
                     << ", ECEF pos y: " << (double)car_telemetry_data.ecef_py << ").");
   }
-
 }
 
 void PacketManagerCore::processPackets() {
@@ -239,7 +238,7 @@ void PacketManagerCore::serialReceivePacket() {
     std::stringstream s;
     s << "Received " << bytes_read  << " bytes of data from the serial communication.";
     console(__func__, s, DEBUG);
-    
+
     if (bytes_read > 0) {
       for (int i=0; i<bytes_read; i++)
         _pm_process_byte(buffer[i]);

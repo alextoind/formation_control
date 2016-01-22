@@ -78,7 +78,7 @@
 class AgentCore {
  public:
   /*  The constructor retrieves the agent parameters from ROS params if specified by the user (default values
-   *  otherwise), initializes all the structures for the algorithm (e.g. estimated_statistics_) and the publishers and
+   *  otherwise), initializes all the structures for the algorithm (e.g. estimated_statistics_) and the publishers
    *  and subscribers needed, and finally waits for the initial TDMA slot (sample_time_ dependent).
    *
    *  Other methods called:

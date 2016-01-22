@@ -473,17 +473,6 @@ formation_control::FormationStatistics VisualizationCore::statsVectorToMsg(const
   return msg;
 }
 
-formation_control::FormationStatisticsStamped VisualizationCore::statsVectorToMsg(const std::string &frame, const int &id,
-                                                                           const std::vector<double> &vector) const {
-  formation_control::FormationStatisticsStamped msg;
-  msg.header.stamp = ros::Time::now();
-  msg.header.frame_id = frame;
-  msg.agent_id = id;
-  msg.stats = statsVectorToMsg(vector);
-
-  return msg;
-}
-
 void VisualizationCore::thetaCorrection(double &theta, const double &theta_old) const {
   std::vector<double> thetas;
   std::vector<double> increments = {0, M_PI_2, M_PI, M_PI + M_PI_2};
