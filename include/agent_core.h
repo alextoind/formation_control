@@ -29,7 +29,7 @@
 #define DEFAULT_MARKER_PATH_LIFETIME 30  // expressed in seconds
 
 /*  This class purpose is to provide a ROS interface which lets to simulate a multi-agent completely distribute
- *  consensus based formation statistics control algorithm. Each object (i.e. each ROS node) represents an independent
+ *  consensus and abstraction based control algorithm. Each object (i.e. each ROS node) represents an independent
  *  agent which shares its estimated statistics with all the others and nothing more (e.g. not its pose) and updates
  *  its estimate statistics based on the estimates of the other agents and on its own pose. Target statistics are
  *  provided to all the agents in the form of 5 floats (first and second order momentum) representing an oriented

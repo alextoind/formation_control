@@ -1,6 +1,6 @@
 <package format="2">
   <name>formation_control</name>
-  <version>0.2.1</version>
+  <version>0.2.2</version>
   <description>
     Distributed Estimation and Control of Swarm Formation Statistics with Simulated and Real Agents.
   </description>
