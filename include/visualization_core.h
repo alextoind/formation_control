@@ -50,7 +50,6 @@
  *    + shared_stats_topic
  *    + target_stats_topic
  *    + agent_poses_topic
- *    + matlab_poses_topic
  *    + marker_topic
  *    + frame_map
  *    + frame_agent_prefix
@@ -89,7 +88,6 @@ class VisualizationCore {
   ros::Publisher marker_publisher_;
   ros::Subscriber stats_subscriber_;
   ros::Subscriber agent_poses_subscriber_;
-  ros::Subscriber matlab_poses_subscriber_;
   ros::Timer algorithm_timer_;
   tf::TransformListener tf_listener_;
   tf::TransformBroadcaster tf_broadcaster_;
@@ -107,7 +105,6 @@ class VisualizationCore {
   std::string shared_stats_topic_name_;
   std::string target_stats_topic_name_;
   std::string agent_poses_topic_name_;
-  std::string matlab_poses_topic_name_;
   std::string marker_topic_name_;
   std::string sync_service_name_;
 
@@ -286,17 +283,6 @@ class VisualizationCore {
    *    + makeBoxControl
    */
   void makeInteractiveMarkerPose(const geometry_msgs::Pose &pose);
-
-  /*  The unique purpose of this method is to provide an interface for those agent which are run from Simulink (which
-   *  has a built-in Publisher block, but which can't handle header/frame field and needs a correction before
-   *  broadcast the agent pose to the tf).
-   *
-   *  Parameters:
-   *    + pose: pose of the matlab agent (the z value is an int representing the agent id times 2).
-   *  Other methods called:
-   *    + agentPosesCallback
-   */
-  void matlabPosesCallback(const geometry_msgs::Pose &pose);
 
   /*  Computes the statistics from the ellipse described by its geometric variables: the 2D pose of its center and the
    *  length of its diameters (a_x and a_y are not properly the diameters, let's call them "generalized diameters").

@@ -12,7 +12,6 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   tf
   interactive_markers
-  serial
 )
 find_package(Eigen REQUIRED)
 
@@ -74,22 +73,5 @@ target_link_libraries(${BIN_VISUALIZATION}
   ${catkin_LIBRARIES}
 )
 add_dependencies(${BIN_VISUALIZATION}
-  ${catkin_EXPORTED_TARGETS}
-)
-
-# Packet Manager:
-set(BIN_PACKET_MANAGER packet_manager)
-
-add_executable(${BIN_PACKET_MANAGER}
-  src/packet_manager_node.cpp
-  src/packet_manager_core.cpp
-  src/packet_manager/packet_manager.c
-  src/packet_manager/packet_agent.c
-  src/packet_manager/packet_car_telemetry.c
-)
-target_link_libraries(${BIN_PACKET_MANAGER}
-  ${catkin_LIBRARIES}
-)
-add_dependencies(${BIN_PACKET_MANAGER}
   ${catkin_EXPORTED_TARGETS}
 )

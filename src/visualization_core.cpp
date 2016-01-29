@@ -24,7 +24,6 @@ VisualizationCore::VisualizationCore() {
   private_node_handle_->param("shared_stats_topic", shared_stats_topic_name_, std::string(DEFAULT_SHARED_STATS_TOPIC));
   private_node_handle_->param("target_stats_topic", target_stats_topic_name_, std::string(DEFAULT_TARGET_STATS_TOPIC));
   private_node_handle_->param("agent_poses_topic", agent_poses_topic_name_, std::string(DEFAULT_AGENT_POSES_TOPIC));
-  private_node_handle_->param("matlab_poses_topic", matlab_poses_topic_name_, std::string(DEFAULT_MATLAB_POSES_TOPIC));
   private_node_handle_->param("marker_topic", marker_topic_name_, std::string(DEFAULT_MARKER_TOPIC));
 
   private_node_handle_->param("frame_map", frame_map_, std::string(DEFAULT_FRAME_MAP));
@@ -59,7 +58,6 @@ VisualizationCore::VisualizationCore() {
   target_stats_publisher_ = node_handle_.advertise<formation_control::FormationStatisticsStamped>(target_stats_topic_name_, topic_queue_length_);
   stats_subscriber_ = node_handle_.subscribe(shared_stats_topic_name_, number_of_agents_, &VisualizationCore::sharedStatsCallback, this);
   agent_poses_subscriber_ = node_handle_.subscribe(agent_poses_topic_name_, 2, &VisualizationCore::agentPosesCallback, this);
-  matlab_poses_subscriber_ = node_handle_.subscribe(matlab_poses_topic_name_, 2, &VisualizationCore::matlabPosesCallback, this);
   interactive_marker_server_ = new interactive_markers::InteractiveMarkerServer("interactive_markers");
 
   algorithm_timer_ = private_node_handle_->createTimer(ros::Duration(sample_time_), &VisualizationCore::algorithmCallback, this);
@@ -353,22 +351,6 @@ void VisualizationCore::makeInteractiveMarkerPose(const geometry_msgs::Pose &pos
   interactive_marker_server_->applyChanges();
 }
 
-void VisualizationCore::matlabPosesCallback(const geometry_msgs::Pose &pose) {
-  // agent_id is hidden in the meaningless z value (z = id*2)
-  std::string frame = frame_agent_prefix_ + std::to_string((int)pose.position.z / 2);
-  if (((int)pose.position.z % 2) != 0) {
-    frame += frame_virtual_suffix_;
-  }
-
-  geometry_msgs::PoseStamped pose_msg;
-  pose_msg.header.frame_id = frame;
-  pose_msg.header.stamp = ros::Time::now();
-  pose_msg.pose = pose;
-  pose_msg.pose.position.z = 0;  // it has to be 0 (2D environment)
-
-  agentPosesCallback(pose_msg);
-}
-
 formation_control::FormationStatistics VisualizationCore::physicsToStats(const geometry_msgs::Pose &pose, const double &a_x,
                                                                   const double &a_y) const {
   double roll, pitch, yaw;
@@ -398,20 +380,15 @@ double VisualizationCore::saturation(const double &value, const double &min, con
 }
 
 void VisualizationCore::sharedStatsCallback(const formation_control::FormationStatisticsStamped &shared) {
-  formation_control::FormationStatisticsStamped msg = shared;
-  if (msg.header.frame_id == "") {  // agent from MATLAB
-    msg.header.frame_id = frame_agent_prefix_ + std::to_string(msg.agent_id) + frame_virtual_suffix_;
-  }
-
-  if (std::find(std::begin(connected_agents_), std::end(connected_agents_), msg.agent_id) == std::end(connected_agents_)) {
-    connected_agents_.push_back(msg.agent_id);  // msg from a new agent
+  if (std::find(std::begin(connected_agents_), std::end(connected_agents_), shared.agent_id) == std::end(connected_agents_)) {
+    connected_agents_.push_back(shared.agent_id);  // msg from a new agent
     updateTarget(target_statistics_.stats);  // notify the current target statistics (actually, to all the agents)
   }
 
-  updateSpanningEllipse(msg);
+  updateSpanningEllipse(shared);
 
   std::stringstream s;
-  s << "Update spanning ellipse for " << msg.header.frame_id;
+  s << "Update spanning ellipse for " << shared.header.frame_id;
   console(__func__, s, DEBUG_VVVV);
 }
 

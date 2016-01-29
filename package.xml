@@ -1,8 +1,8 @@
 <package format="2">
   <name>formation_control</name>
-  <version>0.2.2</version>
+  <version>0.2.3</version>
   <description>
-    Distributed Estimation and Control of Swarm Formation Statistics with Simulated and Real Agents.
+    Distributed Estimation and Control of Swarm Formation Statistics with Simulated Agents.
   </description>
   <author>Alessandro Tondo</author>
   <maintainer email="tondo.codes+ros@gmail.com">Alessandro Tondo</maintainer>
